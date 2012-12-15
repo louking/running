@@ -24,7 +24,7 @@ import gpxpy
 import gpxpy.geo
 
 # home grown
-from goccutils.inc import timeu # TBD need to figure out loutilities issue
+from loutilities import timeu
 
 METERPMILE = 1609.3439941
 t = timeu.asctime('%Y-%m-%dT%H:%M:%SZ')
