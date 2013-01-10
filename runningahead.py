@@ -44,22 +44,16 @@ import httplib2
 # other
 
 # home grown
-
-# general purpose exceptions
-class parameterError(Exception): pass
-class accessError(Exception): pass
+from . import *
 
 # OAuth stuff
-APIKEY = '8561dc05fb554510a2a6bcf443463712'
-APISECRET = '69468bfc99c8401db01556b1e46e2523'
+# TODO: move APIKEY and APISECRET out of this module.  Maybe these should be RunningAhead class arguments
 auth_url = 'https://www.runningahead.com/oauth2/authorize'
 token_url = 'https://api.runningahead.com/oauth2/token'
-FLOW = oaclient.OAuth2WebServerFlow(APIKEY,APISECRET,'authorization_code',redirect_uri='urn:ietf:wg:oauth:2.0:oob',
-                                 auth_uri=auth_url,token_uri=token_url)
 
 # TODO: use CONFIGDIR from __init__.py
-#RADAT = os.path.join(CONFIGDIR,'runningahead.dat')
-RADAT = 'runningahead.dat'
+RADAT = os.path.join(CONFIGDIR,'runningahead.dat')
+#RADAT = 'runningahead.dat'
 
 FIELD = {}
 FIELD['workout'] = {
@@ -80,114 +74,98 @@ class RunningAhead():
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, apikey, apisecret):
     #----------------------------------------------------------------------
         """
         initialize oauth authentication
+        
+        :param apikey: key for runningahead api
+        :param apisecret: secret for runningahead api
         """
 
         storage = oafile.Storage(RADAT)
         self.credentials = storage.get()
         if self.credentials is None or self.credentials.invalid == True:
-            self.credentials = oatools.run(FLOW, storage)
+            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'authorization_code',
+                                                redirect_uri='urn:ietf:wg:oauth:2.0:oob',
+                                                auth_uri=auth_url,token_uri=token_url)
+            self.credentials = oatools.run(flow, storage)
         http = httplib2.Http(timeout=HTTPTIMEOUT)
         self.http = self.credentials.authorize(http)
         
     #----------------------------------------------------------------------
-    def getruns(self,begindate='2013-01-01',enddate='2013-12-31',fields=FIELD['workout'].keys()):
-        # TODO: remove defaults
-    #----------------------------------------------------------------------
-        """
-        return run workouts within date range
-        
-        :param userid: RA userid for which data should be retrieved
-        :param begindate: date in format yyyy-mm-dd
-        :param enddate: date in format yyyy-mm-dd
-        """
-        
-        lpfield = []
-        for f in fields:
-            lpfield.append(str(FIELD['workout'][f]))
-        fields = ','.join(lpfield)
-        
-        BITESIZE = 100
-        #params = {
-        #    'activityID':10,  # run
-        #    'beginDate':begindate,
-        #    'endDate':enddate,
-        #    'limit':BITESIZE,
-        #    'offset':0, # initial offset, updated while iterating below
-        #    'fields':fields,
-        #}
-        #self._authorize(params)
-        offset = 0
-        
-        runs = []
-        while True:
-            #body = urllib.urlencode(params)
-            #url = 'https://api.runningahead.com/rest/logs/me/workouts?' + body
-            #resp,jsoncontent = self.http.request(url)
-            #
-            #if resp.status != 200:
-            #    raise accessError, 'URL response status = '.format(resp.status)
-            #
-            ## unmarshall the response content
-            #content = json.loads(jsoncontent)
-            #
-            #if content['code'] != 0:
-            #    raise accessError, 'RA response code = '.format(content['code'])
-            #
-            #theseruns = content['data']['entries']
-            data = self._raget('workouts',
-                               activityID=10,  # run
-                               beginDate=begindate,
-                               endDate=enddate,
-                               limit=BITESIZE,
-                               offset=offset,
-                               fields=fields,
-                               )
-            theseruns = data['entries']
-            runs += theseruns
-            offset += BITESIZE
-            #params['offset'] += BITESIZE
-            
-            # stop iterating if we've reached the end of the data
-            #if params['offset'] >= content['data']['numEntries']:
-            if offset >= data['numEntries']:
-                break
-            
-        return runs  
-        
-    #----------------------------------------------------------------------
-    def getactivitytypes(self):
+    def listactivitytypes(self):
     #----------------------------------------------------------------------
         """
         return run activity types for this user
         """
         
-        #params = {
-        #}
-        #self._authorize(params)
-        #
-        #body = urllib.urlencode(params)
-        #url = 'https://api.runningahead.com/rest/logs/me/activity_types?' + body
-        #resp,jsoncontent = self.http.request(url)
-        #
-        #if resp.status != 200:
-        #    raise accessError, 'URL response status = '.format(resp.status)
-        #
-        ## unmarshall the response content
-        #content = json.loads(jsoncontent)
-        #
-        #if content['code'] != 0:
-        #    raise accessError, 'RA response code = '.format(content['code'])
-        #
-        #activity_types = content['data']['entries']
-        #return activity_types
-        
         data = self._raget('activity_types')
         activity_types = data['entries']
         return activity_types
+        
+    #----------------------------------------------------------------------
+    def listworkouts(self,begindate=None,enddate=None,getfields=None):
+    #----------------------------------------------------------------------
+        """
+        return run workouts within date range
+        
+        :param begindate: date in format yyyy-mm-dd
+        :param enddate: date in format yyyy-mm-dd
+        :param getfields: list of fields to get in response.  See runningahead.FIELD['workout'].keys() for valid codes
+        """
+        
+        if getfields:
+            lpfield = []
+            for f in getfields:
+                lpfield.append(str(FIELD['workout'][f]))
+            fields = ','.join(lpfield)
+        
+        # fill in optional arguments as needed
+        optargs = {}
+        optargs['activityID'] = 10  # Run
+        if begindate: optargs['beginDate'] = begindate
+        if enddate:   optargs['endDate']   = enddate
+        if getfields: optargs['fields']    = fields
+        
+        # max number of workouts in workout list is 100, so need to loop, collecting
+        # BITESIZE workouts at a time.  These are all added to workouts list, and final
+        # list is returned to the caller
+        BITESIZE = 100
+        offset = 0
+        workouts = []
+        while True:
+            data = self._raget('workouts',
+                               limit=BITESIZE,
+                               offset=offset,
+                               **optargs
+                               )
+            theseworkouts = data['entries']
+            workouts += theseworkouts
+            offset += BITESIZE
+
+            # stop iterating if we've reached the end of the data
+            if offset >= data['numEntries']:
+                break
+        
+        # here would be a fine place to operate on an optional filter parameter.
+        # only problem with that is every time I do that I make the filter parameter
+        # so complex that I can never figure it out myself
+        
+        return workouts  
+        
+    #----------------------------------------------------------------------
+    def getworkout(self,id):
+    #----------------------------------------------------------------------
+        """
+        return workout for specified id
+        
+        :param id: id retrieved from listworkouts for desireed workout
+        """
+        
+        data = self._raget('workouts/{0}'.format(id))
+        workout = data['workout']
+        return workout
         
     #----------------------------------------------------------------------
     def _raget(self,method,**params):
