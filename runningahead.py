@@ -47,13 +47,11 @@ import httplib2
 from . import *
 
 # OAuth stuff
-# TODO: move APIKEY and APISECRET out of this module.  Maybe these should be RunningAhead class arguments
 auth_url = 'https://www.runningahead.com/oauth2/authorize'
 token_url = 'https://api.runningahead.com/oauth2/token'
 
-# TODO: use CONFIGDIR from __init__.py
+# authorized credentials are stored here
 RADAT = os.path.join(CONFIGDIR,'runningahead.dat')
-#RADAT = 'runningahead.dat'
 
 FIELD = {}
 FIELD['workout'] = {
@@ -86,7 +84,8 @@ class RunningAhead():
         storage = oafile.Storage(RADAT)
         self.credentials = storage.get()
         if self.credentials is None or self.credentials.invalid == True:
-            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'authorization_code',
+#            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'authorization_code',
+            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'client_credentials',
                                                 redirect_uri='urn:ietf:wg:oauth:2.0:oob',
                                                 auth_uri=auth_url,token_uri=token_url)
             self.credentials = oatools.run(flow, storage)
@@ -94,13 +93,41 @@ class RunningAhead():
         self.http = self.credentials.authorize(http)
         
     #----------------------------------------------------------------------
+    def listusers(self):
+    #----------------------------------------------------------------------
+        """
+        return users accessible to this application
+        """
+        
+        # max number of users in user list is 100, so need to loop, collecting
+        # BITESIZE users at a time.  These are all added to users list, and final
+        # list is returned to the caller
+        BITESIZE = 100
+        offset = 0
+        users = []
+        while True:
+            data = self._raget('users',
+                               limit=BITESIZE,
+                               offset=offset,
+                               )
+            theseusers = data['entries']
+            users += theseusers
+            offset += BITESIZE
+
+            # stop iterating if we've reached the end of the data
+            if offset >= data['numEntries']:
+                break
+        
+        return users
+        
+    #----------------------------------------------------------------------
     def listactivitytypes(self):
     #----------------------------------------------------------------------
         """
-        return run activity types for this user
+        return activity types for this user
         """
         
-        data = self._raget('activity_types')
+        data = self._raget('logs/me/activity_types')
         activity_types = data['entries']
         return activity_types
         
@@ -135,7 +162,7 @@ class RunningAhead():
         offset = 0
         workouts = []
         while True:
-            data = self._raget('workouts',
+            data = self._raget('logs/me/workouts',
                                limit=BITESIZE,
                                offset=offset,
                                **optargs
@@ -163,7 +190,7 @@ class RunningAhead():
         :param id: id retrieved from listworkouts for desireed workout
         """
         
-        data = self._raget('workouts/{0}'.format(id))
+        data = self._raget('logs/me/workouts/{0}'.format(id))
         workout = data['workout']
         return workout
         
@@ -180,7 +207,7 @@ class RunningAhead():
         self._authorize(params)
         
         body = urllib.urlencode(params)
-        url = 'https://api.runningahead.com/rest/logs/me/{0}?'.format(method) + body
+        url = 'https://api.runningahead.com/rest/{0}?'.format(method) + body
         resp,jsoncontent = self.http.request(url)
         
         if resp.status != 200:
@@ -190,7 +217,7 @@ class RunningAhead():
         content = json.loads(jsoncontent)
         
         if content['code'] != 0:
-            raise accessError, 'RA response code = '.format(content['code'])
+            raise accessError, 'RA response code = {0}'.format(content['code'])
     
         data = content['data']
         return data 
