@@ -81,16 +81,39 @@ class RunningAhead():
         :param apisecret: secret for runningahead api
         """
 
-        storage = oafile.Storage(RADAT)
-        self.credentials = storage.get()
-        if self.credentials is None or self.credentials.invalid == True:
-#            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'authorization_code',
-            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'client_credentials',
-                                                redirect_uri='urn:ietf:wg:oauth:2.0:oob',
-                                                auth_uri=auth_url,token_uri=token_url)
-            self.credentials = oatools.run(flow, storage)
-        http = httplib2.Http(timeout=HTTPTIMEOUT)
-        self.http = self.credentials.authorize(http)
+#        storage = oafile.Storage(RADAT)
+#        self.credentials = storage.get()
+#        if self.credentials is None or self.credentials.invalid == True:
+##            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'authorization_code',
+#            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'client_credentials',
+#                                                redirect_uri='urn:ietf:wg:oauth:2.0:oob',
+#                                                auth_uri=auth_url,token_uri=token_url)
+#            self.credentials = oatools.run(flow, storage)
+        #http = httplib2.Http(timeout=HTTPTIMEOUT)
+        #self.http = self.credentials.authorize(http)
+        
+        # TODO: get credentials from storage
+        
+        # Step 3 from http://api.runningahead.com/docs/authentication (using client_credentials, not authorization_code)
+        self.http = httplib2.Http(timeout=HTTPTIMEOUT)
+        resp,jsoncontent = self._httpreq('https://api.runningahead.com/oauth2/token',
+                                         method='POST',
+                                         client_id=apikey,
+                                         client_secret=apisecret,
+                                         grant_type='client_credentials'
+                                         )
+        content = json.loads(jsoncontent)
+        self.client_credentials = content['access_token']
+        
+        # TODO: this was step 3 for authorization_code, but requires code=code from step 2, which wasn't working
+        #resp,jsoncontent = self._httpreq('https://api.runningahead.com/oauth2/token',
+        #                                 method='POST',
+        #                                 client_id=apikey,
+        #                                 client_secret=apisecret,
+        #                                 grant_type='authorization_code'
+        #                                 )
+        #content = json.loads(jsoncontent)
+        #self.authorization_code = content['access_token']
         
     #----------------------------------------------------------------------
     def listusers(self):
@@ -107,6 +130,7 @@ class RunningAhead():
         users = []
         while True:
             data = self._raget('users',
+                               self.client_credentials,
                                limit=BITESIZE,
                                offset=offset,
                                )
@@ -121,22 +145,25 @@ class RunningAhead():
         return users
         
     #----------------------------------------------------------------------
-    def listactivitytypes(self):
+    def listactivitytypes(self,accesstoken):
     #----------------------------------------------------------------------
         """
         return activity types for this user
+
+        :param accesstoken: access_token to use for api call
         """
         
-        data = self._raget('logs/me/activity_types')
+        data = self._raget('logs/me/activity_types',accesstoken)
         activity_types = data['entries']
         return activity_types
         
     #----------------------------------------------------------------------
-    def listworkouts(self,begindate=None,enddate=None,getfields=None):
+    def listworkouts(self,accesstoken,begindate=None,enddate=None,getfields=None):
     #----------------------------------------------------------------------
         """
         return run workouts within date range
         
+        :param accesstoken: access_token to use for api call
         :param begindate: date in format yyyy-mm-dd
         :param enddate: date in format yyyy-mm-dd
         :param getfields: list of fields to get in response.  See runningahead.FIELD['workout'].keys() for valid codes
@@ -163,6 +190,7 @@ class RunningAhead():
         workouts = []
         while True:
             data = self._raget('logs/me/workouts',
+                               accesstoken,
                                limit=BITESIZE,
                                offset=offset,
                                **optargs
@@ -182,36 +210,52 @@ class RunningAhead():
         return workouts  
         
     #----------------------------------------------------------------------
-    def getworkout(self,id):
+    def getworkout(self,accesstoken,id):
     #----------------------------------------------------------------------
         """
         return workout for specified id
         
+        :param accesstoken: access_token to use for api call
         :param id: id retrieved from listworkouts for desireed workout
         """
         
-        data = self._raget('logs/me/workouts/{0}'.format(id))
+        data = self._raget('logs/me/workouts/{0}'.format(id),accesstoken)
         workout = data['workout']
         return workout
         
     #----------------------------------------------------------------------
-    def _raget(self,method,**params):
+    def getuser(self,accesstoken):
+    #----------------------------------------------------------------------
+        """
+        return workout for specified id
+        
+        :param accesstoken: access_token to use for api call
+        :param id: id retrieved from listworkouts for desireed workout
+        """
+        
+        data = self._raget('users/me'.format(id),accesstoken)
+        user = data['user']
+        return user
+        
+    #----------------------------------------------------------------------
+    def _raget(self,method,accesstoken,**params):
     #----------------------------------------------------------------------
         """
         get method for runningahead access
         
         :param method: runningahead method to call
+        :param accesstoken: access_token to use for api call
         :param **params: parameters for the method
         """
         
-        self._authorize(params)
+        self._authorize(params,accesstoken)
         
         body = urllib.urlencode(params)
-        url = 'https://api.runningahead.com/rest/{0}?'.format(method) + body
+        url = 'https://api.runningahead.com/rest/{0}?{1}'.format(method,body)
         resp,jsoncontent = self.http.request(url)
         
         if resp.status != 200:
-            raise accessError, 'URL response status = '.format(resp.status)
+            raise accessError, 'URL response status = {0}'.format(resp.status)
         
         # unmarshall the response content
         content = json.loads(jsoncontent)
@@ -223,15 +267,42 @@ class RunningAhead():
         return data 
         
     #----------------------------------------------------------------------
-    def _authorize(self,params):
+    def _httpreq(self,url,**params):
+    #----------------------------------------------------------------------
+        """
+        http request
+        
+        :param method: 'GET' or 'POST'
+        :param **params: parameters for the method
+        """
+        
+        method = params.pop('method','GET')
+        
+        if method == 'GET':
+            urlparams = urllib.urlencode(params)
+            url = '{0}?{1}'.format(url,urlparams)
+            body = None
+        elif method == 'POST':
+            url = '{0}'.format(url)
+            body = urllib.urlencode(params)
+        else:
+            raise invalidParameter, '{0} not supported'.format(method)
+        
+        resp,content = self.http.request(url,method,body)
+        
+        if resp.status != 200:
+            raise accessError, 'URL response status = {0}'.format(resp.status)
+        
+        return resp,content
+        
+    #----------------------------------------------------------------------
+    def _authorize(self,params,accesstoken):
     #----------------------------------------------------------------------
         """
         add authorization to params
         
         :param params: list of parameters for API method
+        :param accesstoken: access_token to use
         """
 
-        auth = {}
-        self.credentials.apply(auth)
-        accesstoken = auth['Authorization'].split()[1]
         params['access_token'] = accesstoken
