@@ -6,6 +6,20 @@
 #	----		------		------
 #       01/07/13        Lou King        Create
 #
+#   Copyright 2013 Lou King
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
 ###########################################################################################
 '''
 clubmember - manage club member information
@@ -33,10 +47,6 @@ from loutilities import timeu
 tYmd = timeu.asctime('%Y-%m-%d')
 tHMS = timeu.asctime('%H:%M:%S')
 tMS  = timeu.asctime('%M:%S')
-# 12/30 is used below because excel incorrectly treats 1900 as leap year
-# here, we're assuming that noone was born in 1900, which seems safe
-# see http://www.lexicon.net/sjmachin/xlrd.html for more details
-EXCELEPOCH = tYmd.asc2dt('1899-12-30')
 
 ########################################################################
 class ClubMember():
@@ -66,14 +76,14 @@ class ClubMember():
             thisrow_dict = dict(zip(hdr,thisrow_list))
             name = ' '.join([thisrow_dict['First'],thisrow_dict['Last']])
             thismember = {}
-            thismember['name'] = name
+            thismember['name'] = name.strip()
             try:
-                dob = tYmd.dt2asc(EXCELEPOCH + datetime.timedelta(thisrow_dict['DOB']))
+                dob = tYmd.dt2asc(timeu.excel2dt(thisrow_dict['DOB']))
             except TypeError:   # handle invalid dates
                 dob = None
             thismember['dob'] = dob
-            thismember['gender'] = thisrow_dict['Gender']
-            thismember['hometown'] = ', '.join([thisrow_dict['City'],thisrow_dict['State']])
+            thismember['gender'] = thisrow_dict['Gender'].upper().strip()
+            thismember['hometown'] = ', '.join([thisrow_dict['City'].strip(),thisrow_dict['State'].strip()])
             if name not in self.members:
                 self.members[name] = []
             self.members[name].append(thismember)    # allows for possibility that multiple members have same name
@@ -93,6 +103,7 @@ class ClubMember():
         '''
         
         # TODO: could make self.lmembers be dict {'lmember':member,...} and search for lower case matches, to remove case from the uncertainty
+        # TODO: age should be input to this function, and used to determine if match found
         closematches = difflib.get_close_matches(name,self.members.keys())
         
         rval = {}
@@ -103,6 +114,56 @@ class ClubMember():
             rval['closematches'] = closematches[:]
             
         return rval
+        
+    #----------------------------------------------------------------------
+    def findmember(self,name,age,asofdate):
+    #----------------------------------------------------------------------
+        '''
+        returns (name,dateofbirth) for a specific member, after checking age
+        
+        if name wasn't found, None is returned
+        if no dob in members file, None is returned for dateofbirth
+        
+        :param name: name to search for
+        :param age: age to match for
+        :param asofdate: 'yyyy-mm-dd' date for which age is to be matched
+        :rtype: (name,dateofbirth) or None if not found
+        '''
+        
+        matches = self.getmember(name)
+
+        if not matches: return None
+        
+        foundmember = False
+        membersage = None
+        checkmembers = iter([matches['matchingmembers'][0]['name']] + matches['closematches'])
+        while not foundmember:
+            try:
+                checkmember = next(checkmembers)
+            except StopIteration:
+                break
+            matches = self.getmember(checkmember)
+            for member in matches['matchingmembers']:
+                # assume match for first member of correct age -- TODO: need to do better age checking
+                asofdate_dt = tYmd.asc2dt(asofdate)
+                try:
+                    memberdob = tYmd.asc2dt(member['dob'])
+                    # note below that True==1 and False==0
+                    # TODO: grandprix divisions are from age at Jan 1, while age grading depends on racedate
+                    memberage = asofdate_dt.year - memberdob.year - int((asofdate_dt.month, asofdate_dt.day) < (memberdob.month, memberdob.day))
+                    if memberage == age:
+                        foundmember = True
+                        membername = member['name']
+                # invalid dob in member database
+                except ValueError:
+                    foundmember = True
+                    membername = member['name']
+                if foundmember: break
+                
+        if foundmember:
+            return membername,memberdob
+        else:
+            return None
         
 #----------------------------------------------------------------------
 def main(): # TODO: Update this for testing

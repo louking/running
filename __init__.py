@@ -1,6 +1,6 @@
 #!/usr/bin/python
 ###########################################################################################
-#   running - package with running related scripts
+#   running - general purpose running related scripts
 #
 #   Date        Author      Reason
 #   ----        ------      ------
@@ -22,7 +22,7 @@
 #
 ###########################################################################################
 '''
-running - package with running related scripts
+running - general purpose running related scripts
 ===================================================
 '''
 

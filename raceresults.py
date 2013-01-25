@@ -6,6 +6,20 @@
 #	----		------		------
 #       01/07/13        Lou King        Create
 #
+#   Copyright 2013 Lou King
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+#
 ###########################################################################################
 '''
 raceresults  -- retrieve race results from a file
@@ -34,7 +48,7 @@ fieldxform = {
     'name':['name','runner'],
     'gender':['gender','sex','male/female','s'],
     'age':['age','ag'],
-    'time':['time','nettime'],
+    'time':['actual time','time','nettime'],
 }
 
 # exceptions for this module.  See __init__.py for package exceptions
@@ -54,6 +68,10 @@ class RaceResults():
         # open the textreader using the file
         self.file = textreader.TextReader(filename)
         self.filename = filename
+        
+        # timefactor is based on the first entry's time and distance
+        # see self._normalizetime()
+        self.timefactor = None
         
         # self.field item value will be of form {'begin':startindex,'end':startindex+length} for easy slicing
         self.field = {}
@@ -214,6 +232,44 @@ class RaceResults():
             raise headerError, '{0}: header not found'.format(self.filename)
         
     #----------------------------------------------------------------------
+    def _normalizetime(self,time,distance):
+    #----------------------------------------------------------------------
+        '''
+        normalize the time field, based on distance
+        
+        :param time: time field from original file
+        :param distance: distance of the race, for normalizedtimetype analysis
+        
+        :rtype: float time (seconds)
+        '''
+        
+        # if string, assume hh:mm:ss or mm:ss or ss
+        if type(time) in [str,unicode]:
+            timefields = time.split(':')
+            tottime = 0.0
+            for f in timefields:
+                tottime = tottime*60 + float(f)
+    
+        # if float or int, assume it came from excel, and is in days
+        elif type(time) in [float,int]:
+            tottime = time / (24*60*60.0)
+        
+        # it is possible that excel times have been put in as hh:mm accidentally
+        # use timefactor to adjust this, based on the time of the first runner, and the distance
+        # assume 6mm +/- 50%.  if the time doesn't fit in this range, divide by 60
+        # if time still doesn't fit, ask for help (raise exception)
+        if not self.timefactor:
+            timeestimate = distance * 6.0 * 60  # 6 minute mile
+            self.timefactor = 1.0
+            if tottime > timeestimate * 1.5:
+                self.timefactor = 1/60.0
+            if tottime*self.timefactor < timeestimate * 0.5 or tottime*self.timefactor > timeestimate * 1.5:
+                raise parameterError, '{0}: invalid time detected - {1} ({2} secs) for {3} mile race'.format(self.filename,time,tottime,distance)
+            
+        tottime *= self.timefactor
+        return tottime
+    
+    #----------------------------------------------------------------------
     def next(self):
     #----------------------------------------------------------------------
         '''
@@ -256,12 +312,14 @@ class RaceResults():
                 result['name'] = ' '.join([first,last])
                 
             # look for some obvious errors in name
-            if result['name'][0] in '=-/!':
+            if result['name'] is None or result['name'][0] in '=-/!':
                 textfound = False
                 continue
             
             # TODO: add normalization for gender
-            # TODO: add normalization for race time (e.g., convert hours to minutes if misuse of excel)
+            
+            # add normalization for race time (e.g., convert hours to minutes if misuse of excel)
+            result['time'] = self._normalizetime(result['time'])
         
         # and return result
         return result

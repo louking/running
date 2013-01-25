@@ -34,9 +34,6 @@ import urllib
 import json
 
 # pypi
-from oauth2client import client as oaclient
-from oauth2client import file as oafile
-from oauth2client import tools as oatools
 import httplib2
 
 # github
@@ -134,7 +131,10 @@ class RunningAhead():
                                limit=BITESIZE,
                                offset=offset,
                                )
+            if data['numEntries'] == 0:
+                break
             theseusers = data['entries']
+            
             users += theseusers
             offset += BITESIZE
 
@@ -195,6 +195,9 @@ class RunningAhead():
                                offset=offset,
                                **optargs
                                )
+            if data['numEntries'] == 0:
+                break
+            
             theseworkouts = data['entries']
             workouts += theseworkouts
             offset += BITESIZE
