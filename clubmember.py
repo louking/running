@@ -77,6 +77,7 @@ class ClubMember():
             name = ' '.join([thisrow_dict['First'],thisrow_dict['Last']])
             thismember = {}
             thismember['name'] = name.strip()
+            if thismember['name'] == '': continue   # skip empty names, probably junk at the bottom of member list
             try:
                 dob = tYmd.dt2asc(timeu.excel2dt(thisrow_dict['DOB']))
             except TypeError:   # handle invalid dates
