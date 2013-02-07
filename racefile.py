@@ -61,11 +61,12 @@ class RaceFile():
         workbook = xlrd.open_workbook(filename)
         races_sheet = workbook.sheet_by_name('races')
         series_sheet = workbook.sheet_by_name('series')
+        divisions_sheet = workbook.sheet_by_name('divisions')
         workbook.release_resources()    # sheet is already loaded so we can save memory
 
         # collect series information
         # header row is first row
-        # series header has at least series,age grade,overall,divisions
+        # series header has at least series,members-only,age grade,overall,divisions
         self.series = collections.OrderedDict()
         serieshdr = series_sheet.row_values(0)
         nrows = series_sheet.nrows
@@ -81,9 +82,9 @@ class RaceFile():
                     thisrow_dict[attr] = False
             self.series[thisseries] = thisrow_dict
         
-        # collect race information by race, also collecting series attributes
+        # collect race information by race, also collecting series race is in
         # header row is first row
-        # races header has at least date,time,race,series,result file
+        # races header has at least date,year,time,race,series,result file
         self.races = []
         raceshdr = races_sheet.row_values(0)
         nrows = races_sheet.nrows
@@ -91,22 +92,81 @@ class RaceFile():
             thisrow_list = races_sheet.row_values(rowndx)
             thisrow_dict = dict(zip(raceshdr,thisrow_list))
             thisrow_dict['racenum'] = rowndx
-            ## general series is always included, please others as indicated in file, delimited by ','
-            thisrace_series = ['general']
+
+            # series are indicated in the file, delimited by ','
+            thisrace_series = []
             addlseries = thisrow_dict['series'].split(',')
             if len(addlseries) > 0 and addlseries[0]:   # may only contain null string. if so skip append
-                thisrace_series += addlseries
-            # TODO: {plan is to loop for each series, then use races which are included in the series 
-            #       so no real use for series attributes retrievable from race
-            #thisrow_dict['seriesattr'] = {}
-            #for s in thisrace_series:
-            #    thisrow_dict['seriesattr'][s] = series[s]
-            # TODO: }
+                thisrace_series += [s.strip() for s in addlseries]
             thisrow_dict['inseries'] = thisrace_series
+
             # convert date to ascii from excel.  If ValueError, leave date as it was
             try:
                 thisrow_dict['date'] = tYmd.dt2asc(timeu.excel2dt(thisrow_dict['date']))
             except TypeError:
                 pass
+
             self.races.append(thisrow_dict)
             
+        # collect division information
+        # header row is first row
+        # divisions header has at least series, age-low, age-high
+        self.divisions = {}
+        divisionshdr = divisions_sheet.row_values(0)
+        nrows = divisions_sheet.nrows
+        for rowndx in range(1,nrows):
+            thisrow_list = divisions_sheet.row_values(rowndx)
+            thisrow_dict = dict(zip(divisionshdr,thisrow_list))
+
+            series = thisrow_dict['series']
+            lowage = int(thisrow_dict['age-low'])
+            highage = int(thisrow_dict['age-high'])
+
+            if series not in self.divisions:
+                self.divisions[series] = []
+                
+            self.divisions[series].append ((lowage,highage))
+            
+        for series in self.divisions:
+            self.divisions[series].sort()
+
+    #----------------------------------------------------------------------
+    def getraces(self):
+    #----------------------------------------------------------------------
+        '''
+        return list of races
+        
+        :rtype: [{'race':racename,'year':raceyear,'date':racedate,'time':racestarttime,'inseries':[series,...]},...]
+        '''
+        
+        return self.races
+    
+    #----------------------------------------------------------------------
+    def getseries(self):
+    #----------------------------------------------------------------------
+        '''
+        return dict of series and attributes about how that series should be aggregated / calculated
+        
+        :rtype: {seriesname:{'members-only':boolean,'age grade':boolean,'overall':boolean,'divisions':boolean},...}
+        '''
+        
+        return self.series
+    
+    #----------------------------------------------------------------------
+    def getdivisions(self):
+    #----------------------------------------------------------------------
+        '''
+        return list of divisions and what series these divisions apply to
+        
+        :rtype: {seriesname:[(agelow,agehigh),...]} agelow may be 0, agehigh may be 99, divisions are sorted within series
+        '''
+        
+        return self.divisions
+    
+#----------------------------------------------------------------------
+def main():     # TODO: this would be a good place to put in some unit tests
+#----------------------------------------------------------------------
+    pass
+
+if __name__ == "__main__":
+    main()

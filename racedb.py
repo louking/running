@@ -38,7 +38,6 @@ racedb has the following tables.  See classes of same name (with camelcase) for 
 # standard
 import pdb
 import argparse
-import sqlite3
 import time
 
 # pypi
@@ -50,7 +49,7 @@ import sqlalchemy   # see http://www.sqlalchemy.org/ written with 0.8.0b2
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()   # create sqlalchemy Base class
 from sqlalchemy import Column, Integer, Float, Boolean, String, Sequence, UniqueConstraint, ForeignKey
-from sqlalchemy.orm import sessionmaker, object_mapper
+from sqlalchemy.orm import sessionmaker, object_mapper, relationship, backref
 Session = sessionmaker()    # create sqalchemy Session class
 
 # home grown
@@ -70,7 +69,7 @@ def setracedb(dbfilename):
     :params dbfilename: filename for race database
     '''
     # set up connection to db -- assume sqlite3 for now
-    engine = sqlalchemy.create_engine('sqlite:///{0}'.format(dbfilename))
+    engine = sqlalchemy.create_engine('{0}'.format(dbfilename))
     Base.metadata.create_all(engine)
     Session.configure(bind=engine)
 
@@ -113,6 +112,9 @@ def insert_or_update(session, model, newinstance, skipcolumns=[], **kwargs):
         session.add(newinstance)
         updated = True
 
+    if updated:
+        session.flush()
+        
     return updated
 
 ########################################################################
@@ -142,6 +144,7 @@ class Runner(Base):
     active = Column(Boolean)
     #lastupdate = Column(String(10))
     __table_args__ = (UniqueConstraint('name', 'dateofbirth'),)
+    results = relationship("RaceResult", backref='runner', cascade="all, delete, delete-orphan")
 
     #----------------------------------------------------------------------
     def __init__(self, name, dateofbirth, gender, hometown):
@@ -193,6 +196,8 @@ class Race(Base):
     starttime = Column(String(5))
     distance = Column(Float)
     __table_args__ = (UniqueConstraint('name', 'year'),)
+    results = relationship("RaceResult", backref='race', cascade="all, delete, delete-orphan")
+    series = relationship("RaceSeries", backref='race', cascade="all, delete, delete-orphan")
 
     #----------------------------------------------------------------------
     def __init__(self, name, year, date, starttime, distance):
@@ -278,9 +283,11 @@ class Series(Base):
     id = Column(Integer, Sequence('series_id_seq'), primary_key=True)
     name = Column(String(50),unique=True)
     membersonly = Column(Boolean)
-    overall = Column(Boolean)
-    divisions = Column(Boolean)
-    agegrade = Column(Boolean)
+    calcoverall = Column(Boolean)
+    calcdivisions = Column(Boolean)
+    calcagegrade = Column(Boolean)
+    divisions = relationship("Divisions", backref='series', cascade="all, delete, delete-orphan")
+    races = relationship("RaceSeries", backref='series', cascade="all, delete, delete-orphan")
 
     #----------------------------------------------------------------------
     def __init__(self, name, membersonly, overall, divisions, agegrade):
@@ -288,14 +295,43 @@ class Series(Base):
         
         self.name = name
         self.membersonly = membersonly
-        self.overall = overall
-        self.divisions = divisions
-        self.agegrade = agegrade
+        self.calcoverall = overall
+        self.calcdivisions = divisions
+        self.calcagegrade = agegrade
 
     #----------------------------------------------------------------------
     def __repr__(self):
     #----------------------------------------------------------------------
-        return "<Series('%s','%s','%s','%s','%s')>" % (self.name, self.membersonly, self.overall, self.divisions, self.agegrade)
+        return "<Series('%s','%s','%s','%s','%s')>" % (self.name, self.membersonly, self.calcoverall, self.calcdivisions, self.calcagegrade)
+    
+########################################################################
+class RaceSeries(Base):
+########################################################################
+    '''
+    * raceseries
+        * race/id
+        * series/id
+   
+    :param raceid: race.id
+    :param seriesid: series.id
+    '''
+    __tablename__ = 'raceseries'
+    id = Column(Integer, Sequence('raceseries_id_seq'), primary_key=True)
+    raceid = Column(Integer, ForeignKey('race.id'))
+    seriesid = Column(Integer, ForeignKey('series.id'))
+    __table_args__ = (UniqueConstraint('raceid', 'seriesid'),)
+
+    #----------------------------------------------------------------------
+    def __init__(self, raceid, seriesid):
+    #----------------------------------------------------------------------
+        
+        self.raceid = raceid
+        self.seriesid = seriesid
+
+    #----------------------------------------------------------------------
+    def __repr__(self):
+    #----------------------------------------------------------------------
+        return "<RaceSeries(race='%s',series='%s')>" % (self.raceid, self.seriesid)
     
 ########################################################################
 class Divisions(Base):
@@ -314,7 +350,7 @@ class Divisions(Base):
     id = Column(Integer, Sequence('raceresult_id_seq'), primary_key=True)
     seriesid = Column(Integer, ForeignKey('series.id'))
     divisionlow = Column(Integer)
-    divisionlhigh = Column(Integer)
+    divisionhigh = Column(Integer)
 
     #----------------------------------------------------------------------
     def __init__(self, seriesid, divisionlow, divisionhigh):
@@ -329,424 +365,6 @@ class Divisions(Base):
     #----------------------------------------------------------------------
         return "<Divisions '%s','%s','%s')>" % (self.seriesid, self.divisionlow, self.divisionhigh)
     
-########################################################################
-class RaceDBold():     # TODO: remove in favor of SQLAlchemy based classes
-########################################################################
-    '''
-    manage race database
-    
-    :params dbfilename: filename for race database
-    '''
-    #----------------------------------------------------------------------
-    def __init__(self,dbfilename):
-    #----------------------------------------------------------------------
-        
-        # set up connection to db
-        self.con = sqlite3.connect(dbfilename,detect_types=True)
-        self.con.row_factory = sqlite3.Row
-        
-        #* runner
-        #    * runnername (keyfield)
-        #    * dateofbirth (yyyy-mm-dd) (keyfield)
-        #    * runnerid (incr for join)
-        #    * gender (M/F)
-        #    * hometown (city, ST)
-        #    * active (true/false)
-        #    * lastupdate (yyyy-mm-dd)
-        self.con.execute('''CREATE TABLE IF NOT EXISTS runner(
-                         runnername TEXT,
-                         dateofbirth,
-                         runnerid INTEGER PRIMARY KEY ASC,
-                         gender TEXT,
-                         hometown TEXT,
-                         active INT,
-                         lastupdate TEXT
-                         )'''
-        )
-
-        #* race
-        #    * name
-        #    * year (yyyy)
-        #    * date (yyyy-mm-dd)
-        #    * raceid (incr for join)
-        #    * starttime
-        #    * distance (miles)
-        self.con.execute('''CREATE TABLE IF NOT EXISTS race (
-                         name TEXT,
-                         year int,
-                         date,
-                         raceid INTEGER PRIMARY KEY ASC,
-                         starttime,
-                         distance FLOAT
-                         )'''
-        )
-        
-        #* raceresult
-        #    * runner/id
-        #    * race/id
-        #    * resulttime (seconds)
-        #    * overallplace
-        #    * genderplace
-        #    * divisionplace
-        #    * lastupdate (yyyy-mm-dd hh:mm:ss)
-        self.con.execute('''CREATE TABLE IF NOT EXISTS raceresult (
-                         runnerid INTEGER,
-                         raceid INTEGER,
-                         resulttime FLOAT,
-                         overallplace INT,
-                         genderplace INT,
-                         divisionplace INT,
-                         lastupdate TEXT
-                         )'''
-        )
-        
-        #* divisions
-        #    * series
-        #    * divisionlow - age
-        #    * divisionhigh - age
-        self.con.execute('''CREATE TABLE IF NOT EXISTS divisions (
-                         series TEXT,
-                         divisionlow INT,
-                         divisionhigh INT
-                         )'''
-        )
-
-        #* seriesattributes
-        #    * series
-        #    * flags
-        #       see SERFLAGS for flag bit definitions
-        self.con.execute('''CREATE TABLE IF NOT EXISTS seriesattributes (
-                         series TEXT,
-                         flags INTEGER
-                         )'''
-        )
-
-    #----------------------------------------------------------------------
-    def __del__(self):
-    #----------------------------------------------------------------------
-        '''
-        commit last updates
-        '''
-        
-        self.con.close()
-        
-    #----------------------------------------------------------------------
-    def addrunner(self,name,dateofbirth,gender,hometown):
-    #----------------------------------------------------------------------
-        '''
-        add a runner to runner table, if runner doesn't already exist
-        
-        :param name: runner's name
-        :param dateofbirth: yyyy-mm-dd date of birth
-        :param gender: M|F
-        :param hometown: city, ST
-        '''
-        
-        changesmade = False
-        
-        # some argument error checking
-        if str(gender).upper() not in ['M','F']:
-            raise parameterError, 'invalid gender {0}'.format(gender)
-        gender = gender.upper()
-        
-        try:
-            if dateofbirth:
-                dobtest = t.asc2dt(dateofbirth)
-            # special handling for dateofbirth = None
-            else:
-                dateofbirth = ''
-        except ValueError:
-            raise parameterError, 'invalid dateofbirth {0}'.format(dateofbirth)
-        
-        params = (name,dateofbirth)
-        theserows = self.con.execute('SELECT * FROM runner WHERE runnername=? AND dateofbirth=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in runner for {0} {1}'.format(name,dateofbirth)
-        
-        # found a row, update if something has changed
-        if len(rows) == 1:
-            row = rows[0]
-            if gender.upper() != row['gender'] or hometown != row['hometown']:
-                params = (gender.upper(),hometown,1,t.epoch2asc(time.time()),name,dateofbirth)
-                self.con.execute('UPDATE runner SET (gender=?,hometown=?,active=?,lastupdate=?) WHERE runnername=? AND dateofbirth=?',params)
-                changesmade = True
-                
-        # no rows found, just insert the entry
-        else:
-            params = (name,dateofbirth,gender.upper(),hometown,1,t.epoch2asc(time.time()))
-            self.con.execute('INSERT INTO runner (runnername,dateofbirth,gender,hometown,active,lastupdate) VALUES (?,?,?,?,?,?)',params)
-            changesmade = True
-        
-        # tell caller if any changes were made
-        return changesmade
-    
-    #----------------------------------------------------------------------
-    def listrunners(self):
-    #----------------------------------------------------------------------
-        '''
-        return a list of all runners in the db, (name,dateofbirth)
-        
-        :rtype: [(runnername,dateofbirth),... ]
-        '''
-        
-        runners = []
-        for row in self.con.execute('SELECT runnername, dateofbirth FROM runner'):
-            runners.append((row['runnername'],row['dateofbirth']))
-            
-        return runners
-    
-    #----------------------------------------------------------------------
-    def getrunnerid(self,name,dateofbirth):
-    #----------------------------------------------------------------------
-        '''
-        return the id for a runner, or raise exception if not available
-        
-        :param name: runner's name
-        :param dateofbirth: yyyy-mm-dd date of birth
-        '''
-
-        params = (name,dateofbirth)
-        theserows = self.con.execute('SELECT * FROM runner WHERE runnername=? AND dateofbirth=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in runner for {0} {1}'.format(name,dateofbirth)
-        
-        if len(rows) == 0:
-            raise parameterError, 'could not find runner {0} {1}'.format(name,dateofbirth)
-        
-        row = rows[0]
-        return rows['runnerid']
-        
-    #----------------------------------------------------------------------
-    def addrace(self,name,year,date,starttime,distance):
-    #----------------------------------------------------------------------
-        '''
-        add or update a race in race table
-        
-        :param name: race name
-        :param year: yyyy year of race
-        :param date: yyyy-mm-dd date of race
-        :param starttime: hh:mm time of race
-        :param distance: in miles
-        '''
-        
-        changesmade = False
-        
-        params = (name,year)
-        theserows = self.con.execute('SELECT * FROM race WHERE name=? AND year=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in race for {0} {1}'.format(name,year)
-        
-        # found a row, update if something has changed
-        if len(rows) == 1:
-            row = rows[0]
-            if starttime != row['starttime'] or distance != row['distance']:
-                params = (starttime,date,distance,name,year)
-                self.con.execute('UPDATE race SET (starttime=?,date=?,distance=?) WHERE name=? AND year=?',params)
-                changesmade = True
-                
-        # no rows found, just insert the entry
-        else:
-            params = (name,year,date,starttime,distance)
-            self.con.execute('INSERT INTO race (name,year,date,starttime,distance) VALUES (?,?,?,?,?)',params)
-            changesmade = True
-        
-        # tell caller if any changes were made
-        return changesmade
-    
-    #----------------------------------------------------------------------
-    def listraces(self):
-    #----------------------------------------------------------------------
-        '''
-        return a list of all races in the db, (name,date,distance)
-        
-        :rtype: [(name,year,date,starttime,distance),... ]
-        '''
-        
-        races = []
-        for row in self.con.execute('SELECT name, year, date, starttime, distance FROM race'):
-            races.append((row['name'],row['year'],row['date'],row['starttime'],row['distance']))
-            
-        return races
-    
-    #----------------------------------------------------------------------
-    def getraceid(self,name,year):
-    #----------------------------------------------------------------------
-        '''
-        return the id for a race, or raise exception if not available
-        
-        :param name: race name
-        :param year: yyyy year of race
-        '''
-
-        params = (name,year)
-        theserows = self.con.execute('SELECT * FROM race WHERE name=? AND year=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in race for {0} {1}'.format(name,year)
-        
-        if len(rows) == 0:
-            raise parameterError, 'could not find race {0} {1}'.format(name,year)
-        
-        row = rows[0]
-        return row['raceid']
-        
-    #----------------------------------------------------------------------
-    def getdivisions(self,series):
-    #----------------------------------------------------------------------
-        '''
-        return a list of all divisions, based on series
-        
-        :rtype: [(divisionlow,divisionhigh),... ] - age tuples
-        '''
-        
-        divisions = []
-        params = (series,)
-        for row in self.con.execute('SELECT divisionlow, divisionhigh FROM divisions WHERE series=?',params):
-            divisions.append((row['divisionlow'],row['divisionhigh']))
-            
-        return divisions
-    
-    #----------------------------------------------------------------------
-    def addresult(self,runnerid,raceid,resulttime,overallplace,genderplace,divisionplace=None,agtime=None):
-    #----------------------------------------------------------------------
-        '''
-        add or update the race result for a given runner/race
-        
-        :param runnerid: runnerid from runner table
-        :param raceid: raceid from race table
-        :param resulttime: time in seconds, float
-        :param overallplace: place for this result overall for race
-        :param genderplace: place for this result within gender for race
-        :param divplace: place for this result within division for race
-        :param agtime: age graded time in seconds, float
-        '''
-
-        changesmade = False
-        
-        params = (runnerid,raceid)
-        theserows = self.con.execute('SELECT * FROM raceresult WHERE reunnerid=? AND raceid=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in raceraceresults for reunnerid={0} raceid={1}'.format(runnerid,raceid)
-        
-        # found a row, update if something has changed
-        if len(rows) == 1:
-            row = rows[0]
-            if (resulttime != row['resulttime']
-                or overallplace != row['overallplace']
-                or genderplace != row['genderplace']
-                or divplace != row['divplace']
-                or agtime != row['agtime']
-               ):
-                params = (resulttime,overallplace,genderplace,divisionplace,agtime,runnerid,raceid)
-                self.con.execute('UPDATE raceresult SET (overallplace=?,genderplace=?,divplace=?,divplace=?) WHERE runnerid=? AND raceid=?',params)
-                changesmade = True
-                
-        # no rows found, just insert the entry
-        else:
-            params = (runnerid,raceid,resulttime,overallplace,genderplace,divisionplace,agtime)
-            self.con.execute('INSERT INTO raceresult (runnerid,raceid,resulttime,overallplace,genderplace,divisionplace,agtime) VALUES (?,?,?,?,?,?,?)',params)
-            changesmade = True
-        
-        # tell caller if any changes were made
-        return changesmade
-    
-    #----------------------------------------------------------------------
-    def addseriesattributes(self,series,seriesattr):
-    #----------------------------------------------------------------------
-        '''
-        add or update a seriesattribute in seriesattributes table
-        
-        :param series: series name
-        :param seriesattr: dict with keys same as SERFLAGS, with boolean values
-        '''
-        
-        changesmade = False
-        
-        params = (series,)
-        theserows = self.con.execute('SELECT * FROM seriesattributes WHERE series=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in seriesattributes for {0}'.format(series,year)
-        
-        # what will new flags be?
-        updflags = 0
-        for key in SERFLAGS:
-            if seriesattr[key]:
-                updflags += SERFLAGS[key]
-
-        # found a row, update if any of the flags changed
-        if len(rows) == 1:
-            row = rows[0]
-            flags = row['flags']
-            somethingchanged = False
-            for key in SERFLAGS:
-                if seriesattr[key] != ((flags & SERFLAGS[key]) != 0):
-                    somethingchanged = True
-                    break
-            if somethingchanged:
-                params = (updflags,series)
-                self.con.execute('UPDATE seriesattributes SET (flags=?) WHERE series=?',params)
-                changesmade = True
-                
-        # no rows found, just insert the entry
-        else:
-            params = (series,updflags)
-            self.con.execute('INSERT INTO seriesattributes (series,flags) VALUES (?,?)',params)
-            changesmade = True
-        
-        # tell caller if any changes were made
-        return changesmade
-    
-    #----------------------------------------------------------------------
-    def getseriesattributes(self,series):
-    #----------------------------------------------------------------------
-        '''
-        return series attributes, based on series
-        
-        :rtype: {key:boolean, ...} - see SERFLAGS for keys
-        '''
-        
-        params = (series,)
-        theserows = self.con.execute('SELECT * FROM seriesattributes WHERE series=?', params)
-        rows = theserows.fetchall()
-        if len(rows) > 1:
-            # weirdness -- how'd this happen?
-            raise dbConsistencyError, 'found multiple rows in seriesattributes for {0}'.format(series,year)
-        
-        # will remain like this if no rows were found
-        seriesattr = {}
-
-        # otherwise, set seriesattr based on flags bits
-        if len(rows) == 1:
-            row = rows[0]
-            flags = row['flags']
-            
-            for key in SERFLAGS:
-                seriesattr[key] = False
-                if flags & SERFLAGS[key] != 0:
-                    seriesattr[key] = True
-                    
-        return seriesattr
-    
-    #----------------------------------------------------------------------
-    def commit(self):
-    #----------------------------------------------------------------------
-        '''
-        commit last updates
-        '''
-        
-        self.con.commit()
-        
 #----------------------------------------------------------------------
 def main(): 
 #----------------------------------------------------------------------
@@ -765,7 +383,7 @@ def main():
     if args.memberfile:
         members = clubmember.ClubMember(args.memberfile)
         
-        for name in members.members:
+        for name in members.getmembers():
             thesemembers = members.members[name]
             for thismember in thesemembers:
                 runner = Runner(thismember['name'],thismember['dob'],thismember['gender'],thismember['hometown'])
@@ -783,62 +401,33 @@ def main():
         for runner in runners:
             OUT.write('found id={0}, runner={1}\n'.format(runner.id,runner))
         
-        session.close()
-        
-    
-    OUT.close()
-    
-    '''
-    if args.memberfile:
-        members = clubmember.ClubMember(args.memberfile)
-        
-        for name in members.members:
-            thesemembers = members.members[name]
-            for thismember in thesemembers:
-                added = testdb.addrunner(thismember['name'],thismember['dob'],thismember['gender'],thismember['hometown'])
-                if added:
-                    OUT.write('added runner {0}\n'.format(thismember))
-                else:
-                    OUT.write('did not add runner {0}\n'.format(thismember))
-                
-        testdb.commit()
-        
-        runners = testdb.listrunners()
-        for runner in runners:
-            name,dateofbirth = runner
-            runnerid = testdb.getrunnerid(name,dateofbirth)
-            OUT.write('found id={0}, runner={1}\n'.format(runnerid,runner))
-    
     if args.racefile:
         races = racefile.RaceFile(args.racefile)
         
-        for race in races.races:
-            added = testdb.addrace(race['race'],race['year'],race['date'],race['time'],race['distance'])
+        for race in races.getraces():
+            newrace = Race(race['race'],race['year'],race['date'],race['time'],race['distance'])
+            added = insert_or_update(session,Race,newrace,skipcolumns=['id'],name=newrace.name,year=newrace.year)
             if added:
-                OUT.write('added race {0}\n'.format(race))
+                OUT.write('added or updated race {0}\n'.format(race))
             else:
-                OUT.write ('did not add race {0}\n'.format(race))
+                OUT.write ('no updates necessary {0}\n'.format(race))
         
-        testdb.commit()
+        session.commit()
         
-        dbraces = testdb.listraces()
+        dbraces = session.query(Race).all()
         for race in dbraces:
-            name,year,date,starttime,distance = race
-            raceid = testdb.getraceid(name,year)
-            OUT.write('found id={0}, race={1}\n'.format(raceid,race))
+            OUT.write('found id={0}, race={1}\n'.format(race.id,race))
             
-        for series in races.series.keys():
-            added = testdb.addseriesattributes(series,races.series[series])
-            if added:
-                OUT.write('added seriesattribute for series {0}, {1}\n'.format(series,races.series[series]))
-            else:
-                OUT.write('did not add seriesattribute for series {0}, {1}\n'.format(series,races.series[series]))
-        
-        testdb.commit()
+        #for series in races.series.keys():
+        #    added = testdb.addseriesattributes(series,races.series[series])
+        #    if added:
+        #        OUT.write('added seriesattribute for series {0}, {1}\n'.format(series,races.series[series]))
+        #    else:
+        #        OUT.write('did not add seriesattribute for series {0}, {1}\n'.format(series,races.series[series]))
 
+    session.close()
     OUT.close()
-    '''    
-    
+        
 # ##########################################################################################
 #	__main__
 # ##########################################################################################

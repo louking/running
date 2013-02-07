@@ -90,6 +90,17 @@ class ClubMember():
             self.members[name].append(thismember)    # allows for possibility that multiple members have same name
     
     #----------------------------------------------------------------------
+    def getmembers(self):
+    #----------------------------------------------------------------------
+        '''
+        returns dict keyed by names of members, each containing list of member entries with same name
+        
+        :rtype: {name:[{'name':name,'dob':dateofbirth,'gender':'M'|'F','hometown':City,ST}]}
+        '''
+        
+        return self.members
+    
+    #----------------------------------------------------------------------
     def getmember(self,name):
     #----------------------------------------------------------------------
         '''
