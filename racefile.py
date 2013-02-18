@@ -22,8 +22,8 @@
 #
 ###########################################################################################
 '''
-fsrcresult - determine results for FSRC racesracefile - load file containing race information
-==========================================================
+racefile - load file containing race information
+========================================================
 '''
 
 # standard
@@ -49,7 +49,9 @@ DEBUG = None
 class RaceFile():
 ########################################################################
     '''
-    RaceFile object 
+    RaceFile object
+    
+    TODO: add sheet names and headers required for each sheet to this doc string
     
     :params filename: excel file from which races are to be retrieved
     '''
@@ -103,7 +105,7 @@ class RaceFile():
             # convert date to ascii from excel.  If ValueError, leave date as it was
             try:
                 thisrow_dict['date'] = tYmd.dt2asc(timeu.excel2dt(thisrow_dict['date']))
-            except TypeError:
+            except ValueError:
                 pass
 
             self.races.append(thisrow_dict)

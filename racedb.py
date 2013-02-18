@@ -56,7 +56,6 @@ Session = sessionmaker()    # create sqalchemy Session class
 from running import *
 import version
 from loutilities import timeu
-import clubmember,racefile
 
 t = timeu.asctime('%Y-%m-%d')
 
@@ -122,13 +121,6 @@ class Runner(Base):
 ########################################################################
     '''
     * runner
-        * id (incr for join)
-        * name
-        * dateofbirth (yyyy-mm-dd)
-        * gender (M/F)
-        * hometown (city, ST)
-        * active (true/false)
-        * lastupdate (yyyy-mm-dd)
 
     :param name: runner's name
     :param dateofbirth: yyyy-mm-dd date of birth
@@ -142,7 +134,7 @@ class Runner(Base):
     gender = Column(String(1))
     hometown = Column(String(50))
     active = Column(Boolean)
-    #lastupdate = Column(String(10))
+
     __table_args__ = (UniqueConstraint('name', 'dateofbirth'),)
     results = relationship("RaceResult", backref='runner', cascade="all, delete, delete-orphan")
 
@@ -168,7 +160,7 @@ class Runner(Base):
     #----------------------------------------------------------------------
     def __repr__(self):
     #----------------------------------------------------------------------
-        return "<Runner('%s','%s','%s','%s','%s')>" % (self.name, self.dateofbirth, self.gender, self.hometown, self.active)
+        return "<Runner('%s','%s','%s','%s',active='%s')>" % (self.name, self.dateofbirth, self.gender, self.hometown, self.active)
     
 ########################################################################
 class Race(Base):
@@ -178,89 +170,47 @@ class Race(Base):
         * id (incr for join)
         * name
         * year
+        * racenum - within the year, for rendering
         * date (yyyy-mm-dd)
-        * starttime
+        * starttime - for aggregation with other inputs (e.g., athlinks, runningahead)
         * distance (miles)
     
     :param name: race name
     :param year: year of race
+    :param racenum: number of race within the year
     :param date: yyyy-mm-dd date of race
-    :param starttime: hh:mm starr of race
+    :param starttime: hh:mm start of race
     :param distance: race distance in miles
     '''
     __tablename__ = 'race'
     id = Column(Integer, Sequence('race_id_seq'), primary_key=True)
     name = Column(String(50))
     year = Column(Integer)
+    racenum = Column(Integer)
     date = Column(String(10))
     starttime = Column(String(5))
     distance = Column(Float)
+    active = Column(Boolean)
     __table_args__ = (UniqueConstraint('name', 'year'),)
     results = relationship("RaceResult", backref='race', cascade="all, delete, delete-orphan")
     series = relationship("RaceSeries", backref='race', cascade="all, delete, delete-orphan")
 
     #----------------------------------------------------------------------
-    def __init__(self, name, year, date, starttime, distance):
+    def __init__(self, name, year, racenum, date, starttime, distance):
     #----------------------------------------------------------------------
 
         self.name = name
         self.year = year
+        self.racenum = racenum
         self.date = date
         self.starttime = starttime
         self.distance = distance
+        self.active = True
 
     #----------------------------------------------------------------------
     def __repr__(self):
     #----------------------------------------------------------------------
-        return "<Race('%s','%s','%s','%s','%s')>" % (self.name, self.year, self.date, self.starttime, self.distance)
-    
-########################################################################
-class RaceResult(Base):
-########################################################################
-    '''
-    * raceresult
-        * runner/id
-        * race/id
-        * time (seconds)
-        * overallplace
-        * genderplace
-        * divisionplace
-    
-    :param runnerid: runner.id
-    :param raceid: race.id
-    :param time: time in seconds
-    :param overallplace: runner's place in race overall
-    :param genderplace: runner's place in race within gender
-    :param divisionplace: runner's place in race within division (see division table) - default None
-    :param agtime: age grade time in seconds - default None
-    '''
-    __tablename__ = 'raceresult'
-    id = Column(Integer, Sequence('raceresult_id_seq'), primary_key=True)
-    runnerid = Column(Integer, ForeignKey('runner.id'))
-    raceid = Column(Integer, ForeignKey('race.id'))
-    time = Column(Float)
-    agtime = Column(Float)
-    overallplace = Column(Integer)
-    genderplace = Column(Integer)
-    divisionplace = Column(Integer)
-    __table_args__ = (UniqueConstraint('runnerid', 'raceid'),)
-
-    #----------------------------------------------------------------------
-    def __init__(self, runnerid, raceid, time, overallplace, genderplace, divisionplace=None, agtime=None):
-    #----------------------------------------------------------------------
-        
-        self.runnerid = runnerid
-        self.raceid = raceid
-        self.time = time
-        self.overallplace = overallplace
-        self.genderplace = genderplace
-        self.divisionplace = divisionplace
-        self.agtime = agtime
-
-    #----------------------------------------------------------------------
-    def __repr__(self):
-    #----------------------------------------------------------------------
-        return "<RaceResult('%s','%s','%s','%s','%s','%s','%s')>" % (self.runnerid, self.raceid, self.time, self.overallplace, self.genderplace, self.divisionplace, self.agtime)
+        return "<Race('%s','%s','%s','%s','%s','%s',active='%s')>" % (self.name, self.year, self.racenum, self.date, self.starttime, self.distance, self.active)
     
 ########################################################################
 class Series(Base):
@@ -286,8 +236,10 @@ class Series(Base):
     calcoverall = Column(Boolean)
     calcdivisions = Column(Boolean)
     calcagegrade = Column(Boolean)
+    active = Column(Boolean)
     divisions = relationship("Divisions", backref='series', cascade="all, delete, delete-orphan")
     races = relationship("RaceSeries", backref='series', cascade="all, delete, delete-orphan")
+    results = relationship("RaceResult", backref='series', cascade="all, delete, delete-orphan")
 
     #----------------------------------------------------------------------
     def __init__(self, name, membersonly, overall, divisions, agegrade):
@@ -298,11 +250,87 @@ class Series(Base):
         self.calcoverall = overall
         self.calcdivisions = divisions
         self.calcagegrade = agegrade
+        self.active = True
 
     #----------------------------------------------------------------------
     def __repr__(self):
     #----------------------------------------------------------------------
-        return "<Series('%s','%s','%s','%s','%s')>" % (self.name, self.membersonly, self.calcoverall, self.calcdivisions, self.calcagegrade)
+        return "<Series('%s','%s','%s','%s','%s',active='%s')>" % (self.name, self.membersonly, self.calcoverall, self.calcdivisions, self.calcagegrade, self.active)
+    
+########################################################################
+class RaceResult(Base):
+########################################################################
+    '''
+    * raceresult
+        * runnerid
+        * runnername
+        * raceid
+        * seriesid
+        * gender
+        * divisionlow
+        * divisionhigh
+        * time (seconds)
+        * agtime (seconds)
+        * agpercent
+        * overallplace
+        * genderplace
+        * divisionplace
+    
+    :param runnerid: runner.id
+    :param raceid: race.id
+    :param seriesid: series.id
+    :param time: time in seconds
+    :param gender: M or F
+    :param divisionlow: inclusive age at low end of division (may be 0)
+    :param divisionhigh: inclusive age at high end of division (may be 99)
+    :param overallplace: runner's place in race overall
+    :param genderplace: runner's place in race within gender
+    :param runnername: only used if runner is not in 'runner' table - if used, set runnerid to 0
+    :param divisionplace: runner's place in race within division (see division table) - default None
+    :param agtime: age grade time in seconds - default None
+    :param agpercent: age grade percentage - default None
+    '''
+    __tablename__ = 'raceresult'
+    id = Column(Integer, Sequence('raceresult_id_seq'), primary_key=True)
+    runnerid = Column(Integer, ForeignKey('runner.id'))
+    runnername = Column(String(50))
+    raceid = Column(Integer, ForeignKey('race.id'))
+    seriesid = Column(Integer, ForeignKey('series.id'))
+    gender = Column(String(1))
+    divisionlow = Column(Integer)
+    divisionhigh = Column(Integer)
+    time = Column(Float)
+    agtime = Column(Float)
+    agpercent = Column(Float)
+    overallplace = Column(Integer)
+    genderplace = Column(Integer)
+    divisionplace = Column(Integer)
+    __table_args__ = (UniqueConstraint('runnerid', 'runnername', 'raceid', 'seriesid'),)
+
+    #----------------------------------------------------------------------
+    def __init__(self, runnerid, raceid, seriesid, time, gender, divisionlow, divisionhigh, overallplace, genderplace, runnername=None, divisionplace=None, agtime=None, agpercent=None):
+    #----------------------------------------------------------------------
+        
+        self.runnerid = runnerid
+        self.raceid = raceid
+        self.seriesid = seriesid
+        self.runnername = runnername
+        self.time = time
+        self.gender = gender
+        self.divisionlow = divisionlow
+        self.divisionhigh = divisionhigh
+        self.overallplace = overallplace
+        self.genderplace = genderplace
+        self.divisionplace = divisionplace
+        self.agtime = agtime
+        self.agpercent = agpercent
+
+    #----------------------------------------------------------------------
+    def __repr__(self):
+    #----------------------------------------------------------------------
+        return "<RaceResult('%s','%s','%s','%s','%s',div='(%s,%s)','%s','%s','%s','%s','%s','%s')>" % (
+            self.runnerid, self.runnername, self.raceid, self.seriesid, self.gender, self.divisionlow, self.divisionhigh,
+            self.time, self.overallplace, self.genderplace, self.divisionplace, self.agtime, self.agpercent)
     
 ########################################################################
 class RaceSeries(Base):
@@ -319,6 +347,7 @@ class RaceSeries(Base):
     id = Column(Integer, Sequence('raceseries_id_seq'), primary_key=True)
     raceid = Column(Integer, ForeignKey('race.id'))
     seriesid = Column(Integer, ForeignKey('series.id'))
+    active = Column(Boolean)
     __table_args__ = (UniqueConstraint('raceid', 'seriesid'),)
 
     #----------------------------------------------------------------------
@@ -327,11 +356,12 @@ class RaceSeries(Base):
         
         self.raceid = raceid
         self.seriesid = seriesid
+        self.active = True
 
     #----------------------------------------------------------------------
     def __repr__(self):
     #----------------------------------------------------------------------
-        return "<RaceSeries(race='%s',series='%s')>" % (self.raceid, self.seriesid)
+        return "<RaceSeries(race='%s',series='%s',active='%s')>" % (self.raceid, self.seriesid, self.active)
     
 ########################################################################
 class Divisions(Base):
@@ -347,10 +377,11 @@ class Divisions(Base):
     :param divisionhigh: high age in division
     '''
     __tablename__ = 'divisions'
-    id = Column(Integer, Sequence('raceresult_id_seq'), primary_key=True)
+    id = Column(Integer, Sequence('divisions_id_seq'), primary_key=True)
     seriesid = Column(Integer, ForeignKey('series.id'))
     divisionlow = Column(Integer)
     divisionhigh = Column(Integer)
+    active = Column(Boolean)
 
     #----------------------------------------------------------------------
     def __init__(self, seriesid, divisionlow, divisionhigh):
@@ -359,11 +390,12 @@ class Divisions(Base):
         self.seriesid = seriesid
         self.divisionlow = divisionlow
         self.divisionhigh = divisionhigh
+        self.active = True
 
     #----------------------------------------------------------------------
     def __repr__(self):
     #----------------------------------------------------------------------
-        return "<Divisions '%s','%s','%s')>" % (self.seriesid, self.divisionlow, self.divisionhigh)
+        return "<Divisions '%s','%s','%s',active='%s')>" % (self.seriesid, self.divisionlow, self.divisionhigh, self.active)
     
 #----------------------------------------------------------------------
 def main(): 
@@ -379,8 +411,9 @@ def main():
     OUT = open('racedbtest.txt','w')
     setracedb('testdb.db')
     session = Session()
-    
+
     if args.memberfile:
+        import clubmember
         members = clubmember.ClubMember(args.memberfile)
         
         for name in members.getmembers():
@@ -402,6 +435,7 @@ def main():
             OUT.write('found id={0}, runner={1}\n'.format(runner.id,runner))
         
     if args.racefile:
+        import racefile
         races = racefile.RaceFile(args.racefile)
         
         for race in races.getraces():

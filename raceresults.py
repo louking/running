@@ -37,6 +37,7 @@ import argparse
 # home grown
 import version
 from loutilities import textreader
+from running import *
 
 # fields is a tuple of dict whose keys are the 'real' information we're interested in
 # the value for a particular key contains a tuple with possible header entries which might be used to represent that key
@@ -61,13 +62,15 @@ class RaceResults():
     get race results from a file
     
     :params filename: filename from which race results are to be retrieved
+    :params distance: distance for race (miles)
     '''
     #----------------------------------------------------------------------
-    def __init__(self,filename):
+    def __init__(self,filename,distance):
     #----------------------------------------------------------------------
         # open the textreader using the file
         self.file = textreader.TextReader(filename)
         self.filename = filename
+        self.distance = distance
         
         # timefactor is based on the first entry's time and distance
         # see self._normalizetime()
@@ -252,7 +255,7 @@ class RaceResults():
     
         # if float or int, assume it came from excel, and is in days
         elif type(time) in [float,int]:
-            tottime = time / (24*60*60.0)
+            tottime = time * (24*60*60.0)
         
         # it is possible that excel times have been put in as hh:mm accidentally
         # use timefactor to adjust this, based on the time of the first runner, and the distance
@@ -319,7 +322,7 @@ class RaceResults():
             # TODO: add normalization for gender
             
             # add normalization for race time (e.g., convert hours to minutes if misuse of excel)
-            result['time'] = self._normalizetime(result['time'])
+            result['time'] = self._normalizetime(result['time'],self.distance)
         
         # and return result
         return result
