@@ -32,6 +32,7 @@ import argparse
 import os.path
 import urllib
 import json
+import os.path
 
 # pypi
 import httplib2
@@ -42,13 +43,11 @@ import httplib2
 
 # home grown
 from . import *
+from loutilities import apikey
 
 # OAuth stuff
 auth_url = 'https://www.runningahead.com/oauth2/authorize'
 token_url = 'https://api.runningahead.com/oauth2/token'
-
-# authorized credentials are stored here
-RADAT = os.path.join(CONFIGDIR,'runningahead.dat')
 
 FIELD = {}
 FIELD['workout'] = {
@@ -60,6 +59,61 @@ FIELD['workout'] = {
     'coursename':22,
     }
 HTTPTIMEOUT = 5
+KMPERMILE = 1.609344
+
+#----------------------------------------------------------------------
+def dist2miles(distance):
+#----------------------------------------------------------------------
+    '''
+    convert distance to miles for distance returned from runningahead
+    
+    :param dist: distance field from runningahead
+    :rtype: float - number of miles represented by the distance field
+    '''
+    mpermile = KMPERMILE * 1000
+    
+    unit = distance['unit']
+    
+    if unit == 'mi':
+        distmiles =  distance['value']
+    
+    elif unit == 'km':
+        distmiles = distance['value'] / KMPERMILE
+        
+    elif unit == 'm':
+        distmiles = distance['value'] / mpermile
+        
+    else:
+        raise parameterError, '{0}: invalid unit returned for runningahead distance'.format(unit)
+    
+    return distmiles
+
+#----------------------------------------------------------------------
+def dist2meters(distance):
+#----------------------------------------------------------------------
+    '''
+    convert distance to meters for distance returned from runningahead
+    
+    :param dist: distance field from runningahead
+    :rtype: float - number of meters represented by the distance field
+    '''
+    mpermile = KMPERMILE * 1000
+    
+    unit = distance['unit']
+    
+    if unit == 'mi':
+        distmeters =  distance['value'] * mpermile
+    
+    elif unit == 'km':
+        distmeters = distance['value'] * 1000.0
+        
+    elif unit == 'm':
+        distmeters = distance['value']
+        
+    else:
+        raise parameterError, '{0}: invalid unit returned for runningahead distance'.format(unit)
+    
+    return distmeters
 
 ########################################################################
 class RunningAhead():
@@ -69,48 +123,30 @@ class RunningAhead():
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self, apikey, apisecret):
+    def __init__(self):
     #----------------------------------------------------------------------
         """
         initialize oauth authentication
-        
-        :param apikey: key for runningahead api
-        :param apisecret: secret for runningahead api
         """
 
-#        storage = oafile.Storage(RADAT)
-#        self.credentials = storage.get()
-#        if self.credentials is None or self.credentials.invalid == True:
-##            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'authorization_code',
-#            flow = oaclient.OAuth2WebServerFlow(apikey,apisecret,'client_credentials',
-#                                                redirect_uri='urn:ietf:wg:oauth:2.0:oob',
-#                                                auth_uri=auth_url,token_uri=token_url)
-#            self.credentials = oatools.run(flow, storage)
-        #http = httplib2.Http(timeout=HTTPTIMEOUT)
-        #self.http = self.credentials.authorize(http)
-        
-        # TODO: get credentials from storage
+        # get credentials from configuration
+        ak = apikey.ApiKey('Lou King','running')
+        try:
+            key = ak.getkey('ra')
+            secret = ak.getkey('rasecret')
+        except apikey.unknownKey:
+            raise parameterError, "'ra'  and 'rasecret' keys needs to be configured using apikey"
         
         # Step 3 from http://api.runningahead.com/docs/authentication (using client_credentials, not authorization_code)
         self.http = httplib2.Http(timeout=HTTPTIMEOUT)
         resp,jsoncontent = self._httpreq('https://api.runningahead.com/oauth2/token',
                                          method='POST',
-                                         client_id=apikey,
-                                         client_secret=apisecret,
+                                         client_id=key,
+                                         client_secret=secret,
                                          grant_type='client_credentials'
                                          )
         content = json.loads(jsoncontent)
         self.client_credentials = content['access_token']
-        
-        # TODO: this was step 3 for authorization_code, but requires code=code from step 2, which wasn't working
-        #resp,jsoncontent = self._httpreq('https://api.runningahead.com/oauth2/token',
-        #                                 method='POST',
-        #                                 client_id=apikey,
-        #                                 client_secret=apisecret,
-        #                                 grant_type='authorization_code'
-        #                                 )
-        #content = json.loads(jsoncontent)
-        #self.authorization_code = content['access_token']
         
     #----------------------------------------------------------------------
     def listusers(self):
@@ -233,10 +269,9 @@ class RunningAhead():
         return workout for specified id
         
         :param accesstoken: access_token to use for api call
-        :param id: id retrieved from listworkouts for desireed workout
         """
         
-        data = self._raget('users/me'.format(id),accesstoken)
+        data = self._raget('users/me',accesstoken)
         user = data['user']
         return user
         
@@ -309,3 +344,22 @@ class RunningAhead():
         """
 
         params['access_token'] = accesstoken
+
+#----------------------------------------------------------------------
+def main(): 
+#----------------------------------------------------------------------
+    descr = '''
+    unit test for runningahead.py
+    '''
+    
+    parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     version='{0} {1}'.format('runningclub',version.__version__))
+    args = parser.parse_args()
+
+    # this would be a good place for unit tests
+    
+# ##########################################################################################
+#	__main__
+# ##########################################################################################
+if __name__ == "__main__":
+    main()
