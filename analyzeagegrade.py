@@ -295,22 +295,22 @@ def render(dists,stats,who,size,ylim=None):
     # set up color normalization
     cnorm = colors.LogNorm()
     cnorm.autoscale(stats['dist'])
-    
     cmap = cm.jet
     cmapsm = cm.ScalarMappable(cmap=cmap,norm=cnorm)
     
+    # create figure and axes
     fig = plt.figure()
     fig.autofmt_xdate()
     ax = fig.add_subplot(111)
     ax.set_ylabel('age grade percentage')
-    ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d')
-    fig.suptitle("\n{0}'s age grade performance over time".format(who,s_size))
+    #ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d') # dead?
+    fig.suptitle("{0}'s age grade performance over time".format(who,s_size))
         
     lines = []
     labs = []
     l_dists = list(dists)
     l_dists.sort()
-    fig.subplots_adjust(bottom=0.1, right=0.8, top=0.9)
+    fig.subplots_adjust(bottom=0.1, right=0.85, top=0.93)
     ax.grid(b=True)
     for thisd in l_dists:
         if int(thisd) in SUBS:
@@ -324,8 +324,7 @@ def render(dists,stats,who,size,ylim=None):
         color = cmapsm.to_rgba(thisd)
         numels = len(hdate[thisd])
         line = ax.scatter(hdate[thisd],hag[thisd],s=hsize[thisd],c=[color for i in range(numels)],label=lab,linewidth=.5)
-        #line = ax.scatter(hdate[thisd],hag[thisd],s=60,c=cmapsm.to_rgba(thisd),label=lab,edgecolors='none')
-        lines.append(line)
+        #lines.append(line)
 
         ### DEBUG>
         if debug:
@@ -339,30 +338,37 @@ def render(dists,stats,who,size,ylim=None):
                 DEB.writerow(thisstat)
         ### <DEBUG
 
-    # set x label format
+    # set x (date) label format
     hfmt = mdates.DateFormatter('%m/%d/%y')
     ax.xaxis.set_major_formatter(hfmt)
     ax.xaxis.set_minor_formatter(hfmt)
-    
     labels = ax.get_xticklabels()
     for label in labels:
         label.set_rotation(65)
         label.set_size('xx-small')
 
     # maybe user wants to set ylim
-    # TODO: check to see if any points are outside this limit, and print warning
+    # check to see if any points are outside this limit, and print warning
     if ylim:
         ax.set_ylim(ylim)
+        outsidelimits = 0
+        numpoints = 0
+        for thisd in l_dists:
+            for i in range(len(hdate[thisd])):
+                numpoints += 1
+                if hag[thisd][i] < ylim[0] or hag[thisd][i] > ylim[1]:
+                    outsidelimits += 1
+        if outsidelimits > 0:
+            print '*** WARNING: {} of {} points found outside of ylim {}'.format(outsidelimits,numpoints,ylim)
         
     ### DEBUG>
     if debug:
         _DEB.close()
     ### <DEBUG
 
-    smallfont = fontmgr.FontProperties(size='small')
-    ax.legend(loc=1,bbox_to_anchor=(1.25, 1),prop=smallfont)    #bbox_to_anchor moves legend outside axes
+    smallfont = fontmgr.FontProperties(size='x-small')
+    ax.legend(loc=1,bbox_to_anchor=(1.19, 1),prop=smallfont)    #bbox_to_anchor moves legend outside axes
     fig.savefig(outfile,format='png')
-    del fig
     
 #-------------------------------------------------------------------------------
 def main():
