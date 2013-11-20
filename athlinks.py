@@ -32,7 +32,8 @@ import argparse
 import os.path
 import urllib
 import json
-import os.path
+import logging
+logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s')
 
 # pypi
 import httplib2
@@ -43,19 +44,62 @@ import httplib2
 
 # home grown
 from loutilities import apikey
-from running import accessError
+from running import accessError, parameterError
 
 # access stuff
 ATHLINKS_URL = 'http://api.athlinks.com'
 RESULTS_SEARCH = 'Results/search'
 RACE_SEARCH = 'races/{id}'
 COURSE_SEARCH = 'races/{raceid}/{courseid}'
-MEMBER_SEARCH = 'athletes/results/{id}'
-MEMBER_DETAILS = 'athletes/details/{id}'
+MEMBER_RESULTS_SEARCH = 'athletes/results/{id}'
+MEMBER_DETAILS = 'athletes/details/{handle}'
 ATH_CAT_RUNNING = 2
 
-HTTPTIMEOUT = 5
-KMPERMILE = 1.609344
+HTTPTIMEOUT = 10
+MPERMILE = 1609.344
+
+
+#----------------------------------------------------------------------
+def gettime(athlinkstime):
+#----------------------------------------------------------------------
+    '''
+    return epoch time based on athlinks time
+    
+    :param athlinkstime: time from athlinks record
+    :rtype: int containing epoch time
+    '''
+    # parse racedate.  racedate is '\Date(<epochtime*1000>)\'  
+    while athlinkstime[0] not in '0123456789':
+        athlinkstime = athlinkstime[1:]
+    while athlinkstime[-1] not in '0123456789':
+        athlinkstime = athlinkstime[:-1]
+    return int(athlinkstime)/1000  # strange format, but that's what it is
+
+#----------------------------------------------------------------------
+def dist2miles(distunit,disttypeid):
+#----------------------------------------------------------------------
+    '''
+    get distance in miles, based on athlinks distunit, disttypeid
+    
+    :param distunit: number of units of distance, unit based on disttypeid
+    :param disttypeid: meters=6, others unknown
+    '''
+    if disttypeid != 6:
+        raise parameterError, 'unknown disttypeid {}'.format(disttypeid)
+    return distunit / MPERMILE
+
+#----------------------------------------------------------------------
+def dist2km(distunit,disttypeid):
+#----------------------------------------------------------------------
+    '''
+    get distance in kilometers, based on athlinks distunit, disttypeid
+    
+    :param distunit: number of units of distance, unit based on disttypeid
+    :param disttypeid: meters=6, others unknown
+    '''
+    if disttypeid != 6:
+        raise parameterError, 'unknown disttypeid {}'.format(disttypeid)
+    return distunit / 1000
 
 ########################################################################
 class Athlinks():
@@ -80,8 +124,12 @@ class Athlinks():
         # need http object
         self.http = httplib2.Http(timeout=HTTPTIMEOUT)
 
-        # initial value - modify with self.setdebug(value)
-        self.debug = debug
+        # set up logging level
+        self.log = logging.getLogger('running.athlinks')
+        self.setdebug(debug)
+        
+        # count how many pages have been retrieved
+        self.urlcount = 0
         
     #----------------------------------------------------------------------
     def setdebug(self,debugval):
@@ -91,8 +139,22 @@ class Athlinks():
         
         :param debugval: set to True to enable debugging
         '''
-        self.debug = debugval
+        if not debugval:
+            level = logging.INFO
+        else:
+            level = logging.DEBUG
+        self.log.setLevel(level)
         
+    #----------------------------------------------------------------------
+    def geturlcount(self):
+    #----------------------------------------------------------------------
+        '''
+        each time a url is retrieved, this counter is bumped
+        
+        :rtype: integer, number of url's retrieved
+        '''
+        return self.urlcount
+
     #----------------------------------------------------------------------
     def listathleteresults(self,name,**filt):
     #----------------------------------------------------------------------
@@ -109,7 +171,7 @@ class Athlinks():
         races = []
         while True:
             data = self._get(RESULTS_SEARCH,
-                               pagesize=50,
+                               pagesize=500,
                                page=page,
                                name=name,
                                includeclaimed=True
@@ -127,6 +189,19 @@ class Athlinks():
 
         races = filter(_checkfilter,races)
         return races
+        
+    #----------------------------------------------------------------------
+    def getmember(self,handle):
+    #----------------------------------------------------------------------
+        '''
+        get member record associated with handle
+        
+        :param handle: handle for member, ID or email should work
+        '''
+        handle = urllib.quote(str(handle))
+        data = self._get(MEMBER_DETAILS.format(handle=handle)
+                           )
+        return data
         
     #----------------------------------------------------------------------
     def getrace(self,id):
@@ -167,9 +242,22 @@ class Athlinks():
         
         body = urllib.urlencode(params)
         url = '{}/{}?{}'.format(ATHLINKS_URL,method,body)
-        if self.debug:
-            print url
-        resp,jsoncontent = self.http.request(url)
+        
+        # loop RETRIES times for timeout
+        retries = 10
+        while retries > 0:
+            retries -= 1
+            try:
+                self.log.debug(url)
+                resp,jsoncontent = self.http.request(url)
+                self.urlcount += 1
+                break
+            except Exception, e:
+                if retries == 0:
+                    self.log.info('{} requests attempted'.format(self.geturlcount()))
+                    self.log.error('http request failure, retries exceeded: {0}'.format(e))
+                    raise
+                self.log.warning('http request failure: {0}'.format(e))
         
         if resp.status != 200:
             raise accessError, 'URL response status = {0}'.format(resp.status)
@@ -187,7 +275,7 @@ def main():
     '''
     
     parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('runningclub',version.__version__))
+                                     version='{0} {1}'.format('running',version.__version__))
     args = parser.parse_args()
 
     # this would be a good place for unit tests

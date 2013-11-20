@@ -32,7 +32,6 @@ import argparse
 import os.path
 import urllib
 import json
-import os.path
 
 # pypi
 import httplib2
@@ -353,7 +352,7 @@ def main():
     '''
     
     parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('runningclub',version.__version__))
+                                     version='{0} {1}'.format('running',version.__version__))
     args = parser.parse_args()
 
     # this would be a good place for unit tests
