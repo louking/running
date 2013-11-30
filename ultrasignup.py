@@ -46,6 +46,7 @@ from IPython.core.debugger import Tracer; debug_here = Tracer()
 # home grown
 from loutilities import timeu
 from loutilities import csvu
+from runningclub import render
 from running import accessError, parameterError
 
 # access stuff
@@ -115,6 +116,50 @@ def racenameanddist(el):
         distkm = None
 
     return racename,distmiles,distkm
+
+#----------------------------------------------------------------------
+def racenameanddur(el):
+#----------------------------------------------------------------------
+    '''
+    get race name and duration from etree element
+    
+    :param el: element from last column of untrasignup.com
+    :rtype: racename, duration
+    '''
+
+    # one child, a link
+    linkel = el.getchildren()[0]
+    
+    # but all we need is the text, formatted as
+    # <racename> - <dist><units>
+    racetext = linkel.text.strip()
+    fields = racetext.split('-')
+    
+    # include distance in racename, as sometimes it's missing
+    racename = racetext
+    durfield = fields[-1].strip()
+    
+    # accumulate duration, and figure out where units field starts
+    dur = 0
+    startunits = 0
+    for digit in durfield:
+        if not digit.isdigit():
+            break
+        dur *= 10
+        dur += int(digit)
+        startunits += 1
+    
+    # pull out the units from the durance field, and interpret
+    units = durfield[startunits:]
+    
+    # kilometers
+    if units == 'HRS':
+        duration = dur
+    
+    else:
+        duration = None
+
+    return racename,duration
 
 ########################################################################
 class UltraSignupResult():
@@ -277,8 +322,15 @@ class UltraSignup():
             result.set(zip(UltraSignupResult.attrs,cols))
             result.racename,result.distmiles,result.distkm = racenameanddist(row[-1])
             
-            # skip races which are not mileage based
-            if result.distmiles == None: continue   
+            # distmiles == None if this was a gimed race.  result.racetime has distance in miles
+            if result.distmiles == None:
+                result.racename,duration = racenameanddur(row[-1])
+                if duration is None: continue   # didn't recognize units
+                
+                result.distmiles = result.racetime
+                result.distkm = result.distmiles * (MPERMILE/1000)
+                # this is in hours so should render correctly
+                result.racetime = render.rendertime(duration*60*60.0,0)
             
             results.append(result)
             

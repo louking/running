@@ -25,7 +25,7 @@ import time
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s')
 log = logging.getLogger('running.analyzeagegrade')
-log.setLevel(logging.DEBUG)
+log.setLevel(logging.INFO)
 
 # other libraries
 import matplotlib.pyplot as plt
@@ -149,7 +149,6 @@ class AnalyzeAgeGrade():
         self.gender = None
         self.dob = None
         self.cmapsm = None
-        self.fig = plt.figure()
         self.renderfname = '{who}-ag-analysis-{date}-{time}.png'
         self.xlim = {'left':None,'right':None}
         self.ylim = None    # TODO: make 'top','bottom' dict
@@ -201,7 +200,7 @@ class AnalyzeAgeGrade():
         try:
             self.stats.remove(stat)
         except ValueError:
-            pass
+            log.warning('del_stat: failed to delete {}'.format(stat))
         
     #-------------------------------------------------------------------------------
     def get_stats(self):
@@ -272,6 +271,10 @@ class AnalyzeAgeGrade():
             prio,stat = sameraces[0]
             deduped.append(stat)
         
+        dupremoved = len(self.stats) - len(deduped)
+        if dupremoved > 0:
+            log.debug('{} duplicate points removed, runner {}'.format(dupremoved,self.who))
+
         # replace self.stats with deduplicated version
         self.stats = deduped
 
@@ -530,7 +533,7 @@ class AnalyzeAgeGrade():
         ### <DEBUG
     
     #-------------------------------------------------------------------------------
-    def render_stats(self):
+    def render_stats(self,fig):
     #-------------------------------------------------------------------------------
         '''
         plot the data in dists
@@ -568,19 +571,18 @@ class AnalyzeAgeGrade():
                 hsize[d].append(DEFAULTSIZE)
         
         # create figure and axes
-        self.fig.clear()
-        self.fig.autofmt_xdate()
-        self.ax = self.fig.add_subplot(111)
-        self.ax.set_ylabel('age grade percentage')
-        #self.ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d') # dead?
-        self.fig.suptitle("{}".format(self.who))
+        fig.autofmt_xdate()
+        ax = fig.get_axes()[0]  # only one axes instance
+        ax.set_ylabel('age grade percentage')
+        #ax.fmt_xdata = mdates.DateFormatter('%Y-%m-%d') # dead?
+        fig.suptitle("{}".format(self.who))
             
         lines = []
         labs = []
         l_dists = list(self.dists)
         l_dists.sort()
-        self.fig.subplots_adjust(bottom=0.1, right=0.85, top=0.93)
-        self.ax.grid(b=True)
+        fig.subplots_adjust(bottom=0.1, right=0.85, top=0.93)
+        ax.grid(b=True)
         for thisd in l_dists:
             # some results for this distance may have been pulled out due to filtering
             if len(hag[thisd]) == 0: continue
@@ -595,7 +597,7 @@ class AnalyzeAgeGrade():
             labs.append(lab)
             color = self.cmapsm.to_rgba(thisd)
             numels = len(hdate[thisd])
-            line = self.ax.scatter(hdate[thisd],hag[thisd],s=hsize[thisd],c=[color for i in range(numels)],label=lab,linewidth=.5)
+            line = ax.scatter(hdate[thisd],hag[thisd],s=hsize[thisd],c=[color for i in range(numels)],label=lab,linewidth=.5)
             #lines.append(line)
     
             ### DEBUG>
@@ -612,20 +614,20 @@ class AnalyzeAgeGrade():
     
         # set x (date) label format
         hfmt = mdates.DateFormatter('%m/%d/%y')
-        self.ax.xaxis.set_major_formatter(hfmt)
-        self.ax.xaxis.set_minor_formatter(hfmt)
-        labels = self.ax.get_xticklabels()
+        ax.xaxis.set_major_formatter(hfmt)
+        ax.xaxis.set_minor_formatter(hfmt)
+        labels = ax.get_xticklabels()
         for label in labels:
             label.set_rotation(65)
             label.set_size('xx-small')
     
         # maybe user wants to set xlim
-        self.ax.set_xlim(left=self.xlim['left'],right=self.xlim['right'])
+        ax.set_xlim(left=self.xlim['left'],right=self.xlim['right'])
             
         # maybe user wants to set ylim
         # check to see if any points are outside this limit, and print warning
         if self.ylim:
-            self.ax.set_ylim(self.ylim)
+            ax.set_ylim(self.ylim)
             outsidelimits = 0
             numpoints = 0
             for thisd in l_dists:
@@ -645,17 +647,18 @@ class AnalyzeAgeGrade():
     
     
     #-------------------------------------------------------------------------------
-    def render_annotate(self, s, xy, **kwargs):
+    def render_annotate(self, fig, s, xy, **kwargs):
     #-------------------------------------------------------------------------------
         '''
         plot a trend line
         
         see http://matplotlib.org/api/axes_api.html#matplotlib.axes.Axes.annotate for parameters
         '''
-        self.ax.annotate(s,xy,**kwargs)
+        ax = fig.get_axes()[0]  # only one axes instance
+        ax.annotate(s,xy,**kwargs)
         
     #-------------------------------------------------------------------------------
-    def render_trendline(self, label, thesestats=None, color=None):
+    def render_trendline(self, fig, label, thesestats=None, color=None):
     #-------------------------------------------------------------------------------
         '''
         plot a trend line
@@ -666,6 +669,8 @@ class AnalyzeAgeGrade():
         :rtype: :class:`TrendLine` containing parameters of trendline
         '''
         
+        ax = fig.get_axes()[0]  # only one axes instance
+
         if not thesestats:
             thesestats = self.stats
         
@@ -673,27 +678,28 @@ class AnalyzeAgeGrade():
         y = [s.ag for s in thesestats]
         
         slope,intercept,rvalue,pvalue,stderr = stats.linregress(x,y)
-        xline = self.ax.get_xlim()  # returns floats, not datetimes
+        xline = ax.get_xlim()  # returns floats, not datetimes
         yline = [slope*thisx+intercept for thisx in xline]
         
         if color:
-            self.ax.plot(xline,yline,color=color,linestyle='-',label=label)
+            ax.plot(xline,yline,color=color,linestyle='-',label=label)
         else:
-            self.ax.plot(xline,yline,linestyle='-',label=label)
+            ax.plot(xline,yline,linestyle='-',label=label)
 
         return TrendLine(slope,intercept,rvalue,pvalue,stderr)
         
     #-------------------------------------------------------------------------------
-    def save(self):
+    def save(self,fig):
     #-------------------------------------------------------------------------------
         '''
         save the plot in indicated file
         '''
         outfile = self.get_outfilename()
     
+        ax = fig.get_axes()[0]  # only one axes instance
         smallfont = fontmgr.FontProperties(size='x-small')
-        self.ax.legend(loc=1,bbox_to_anchor=(1.19, 1),prop=smallfont)    #bbox_to_anchor moves legend outside axes
-        self.fig.savefig(outfile,format='png')
+        ax.legend(loc=1,bbox_to_anchor=(1.19, 1),prop=smallfont)    #bbox_to_anchor moves legend outside axes
+        fig.savefig(outfile,format='png')
         
 #-------------------------------------------------------------------------------
 def main():
@@ -761,9 +767,11 @@ def main():
         aag.set_ylim(ylim[0],ylim[1])
     
     # plot statistics
-    aag.render_stats()
-    aag.render_trendline('trend',color='k')
-    aag.save()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    aag.render_stats(fig)
+    aag.render_trendline(fig,'trend',color='k')
+    aag.save(fig)
     
     
 # ###############################################################################

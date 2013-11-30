@@ -41,7 +41,7 @@ import httplib2
 # other
 
 # home grown
-from . import *
+from running import *
 from loutilities import apikey
 
 # OAuth stuff

@@ -1,10 +1,10 @@
 #!/usr/bin/python
 ###########################################################################################
-#   ultrasignupresults - manage race results data from ultrasignup
+#   runningaheadresults - manage race results data from runningahead
 #
 #   Date        Author      Reason
 #   ----        ------      ------
-#   11/13/13    Lou King    Create
+#   11/27/13    Lou King    Create
 #
 #   Copyright 2013 Lou King
 #
@@ -22,14 +22,14 @@
 #
 ###########################################################################################
 '''
-ultrasignupresults - manage race results data from ultrasignup
+runningaheadresults - manage race results data from runningahead
 ===================================================================
 
 Usage::
-    ultrasignupresults.py [-h] [-v] [-b BEGINDATE] [-e ENDDATE]
+    runningaheadresults.py [-h] [-v] [-b BEGINDATE] [-e ENDDATE]
                                      searchfile outfile
     
-        collect race results from ultrasignup
+        collect race results from runningahead
     
         searchfile must have at least the following headings:
     
@@ -63,6 +63,10 @@ import tempfile
 import csv
 import datetime
 import time
+import logging
+logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s')
+log = logging.getLogger('running.ultrasignup')
+log.setLevel(logging.DEBUG)
 
 # pypi
 from IPython.core.debugger import Tracer; debug_here = Tracer()
@@ -75,20 +79,22 @@ from IPython.core.debugger import Tracer; debug_here = Tracer()
 from loutilities import timeu
 from loutilities import csvu
 from runningclub import agegrade
-import ultrasignup
+from runningclub import render
+import runningahead
+from runningahead import FIELD
 import version
 
-# see http://api.ultrasignup.com/Enums/RaceCategories
 ag = agegrade.AgeGrade()
 class invalidParameter(Exception): pass
 
 ftime = timeu.asctime('%Y-%m-%d')
+METERSPERMILE = 1609.344
 
 #----------------------------------------------------------------------
 def collect(searchfile,outfile,begindate,enddate):
 #----------------------------------------------------------------------
     '''
-    collect race results from ultrasignup
+    collect race results from runningahead
     
     :param searchfile: path to file containing names, genders, birth dates to search for
     :param outfile: output file path
@@ -96,18 +102,25 @@ def collect(searchfile,outfile,begindate,enddate):
     :param enddate: epoch time - choose races between begindate and enddate
     '''
     
+    outfilehdr = 'GivenName,FamilyName,name,DOB,Gender,race,date,age,miles,km,time'.split(',')
+    
     # open files
     _IN = open(searchfile,'rb')
     IN = csv.DictReader(_IN)
     _OUT = open(outfile,'wb')
-    OUT = csv.DictWriter(_OUT,UltraSignupResultFile.filehdr)
+    OUT = csv.DictWriter(_OUT,outfilehdr)
     OUT.writeheader()
 
     # common fields between input and output
     commonfields = 'GivenName,FamilyName,DOB,Gender'.split(',')
 
-    # create ultrasignup access
-    ultra = ultrasignup.UltraSignup(debug=True)
+    # create runningahead access, grab users who have used the steeplechasers.org portal to RA
+    ra = runningahead.RunningAhead()
+    users = ra.listusers()
+    rausers = []
+    for user in users:
+        rauser = ra.getuser(user['token'])
+        rausers.append((user,rauser))
 
     # reset begindate to beginning of day, enddate to end of day
     dt_begindate = timeu.epoch2dt(begindate)
@@ -124,61 +137,65 @@ def collect(searchfile,outfile,begindate,enddate):
     # loop through runners in the input file
     for runner in IN:
         fname,lname = runner['GivenName'],runner['FamilyName']
+        membername = '{} {}'.format(fname,lname)
+        log.debug('looking for {}'.format(membername))
         e_dob = ftime.asc2epoch(runner['DOB'])
         dt_dob = ftime.asc2dt(runner['DOB'])
+        dob = runner['DOB']
         gender = runner['Gender'][0]
+
+        # find thisuser
+        foundmember = False
+        for user,rauser in rausers:
+            if 'givenName' not in rauser or 'birthDate' not in rauser: continue    # we need to know the name and birth date
+            givenName = rauser['givenName'] if 'givenName' in rauser else ''
+            familyName = rauser['familyName'] if 'familyName' in rauser else ''
+            rausername = '{} {}'.format(givenName,familyName)
+            if rausername == membername and dt_dob == ftime.asc2dt(rauser['birthDate']):
+                foundmember = True
+                log.debug('found {}'.format(membername))
+                break
+            # member is not this ra user, keep looking
+
+        # if we couldn't find this member in RA, try the next member
+        if not foundmember: continue
         
         # skip getting results if participant too young
         todayage = timeu.age(today,dt_dob)
         if todayage < 14: continue
         
-        # get results for this athlete
-        results = ultra.listresults(fname,lname)
+        # if we're here, found the right user, now let's look at the workouts
+        workouts = ra.listworkouts(user['token'],begindate=dt_begindate,enddate=dt_enddate,getfields=FIELD['workout'].keys())
+
+        # save race workouts, if any found
+        results = []
+        if workouts:
+            for wo in workouts:
+                if wo['workoutName'].lower() != 'race': continue
+                thisdate = wo['date']
+                dt_thisdate = ftime.asc2dt(thisdate)
+                thisdist = runningahead.dist2meters(wo['details']['distance'])
+                thistime = wo['details']['duration']
+                thisrace = wo['course']['name'] if wo.has_key('course') else 'unknown'
+                if thistime == 0:
+                    log.warning('{} has 0 time for {} {}'.format(membername,thisrace,thisdate))
+                    continue
+                stat = {'GivenName':fname,'FamilyName':lname,'name':membername,
+                        'DOB':dob,'Gender':gender,'race':thisrace,'date':thisdate,'age':timeu.age(dt_thisdate,dt_dob),
+                        'miles':thisdist/METERSPERMILE,'km':thisdist/1000.0,'time':render.rendertime(thistime,0)}
+                results.append(stat)
         
         # loop through each result
         for result in results:
-            e_racedate = ftime.asc2epoch(result.racedate)
+            e_racedate = ftime.asc2epoch(result['date'])
             
             # skip result if outside the desired time window
             if e_racedate < begindate or e_racedate > enddate: continue
             
-            # skip result if runner's age doesn't match the age within the result
-            dt_racedate = timeu.epoch2dt(e_racedate)
-            racedateage = timeu.age(dt_racedate,dt_dob)
-            if result.age != racedateage: continue
-            
-            # assume gender is correct -- TODO: fix ultrasignup to extract gender into UltraSignupResult instance
-            #resultgen = result.gender
-            #if resultgen != runner['Gender'][0]: continue
-            
-            # create output record and copy common fields
-            outrec = {}
-            for field in commonfields:
-                outrec[field] = runner[field]
-                
-            # fill in output record fields from runner, result
-            # combine name, get age
-            outrec['name'] = '{} {}'.format(runner['GivenName'],runner['FamilyName'])
-            outrec['age'] = result.age
+            # create output record and copy fields
+            outrec = result
+            resulttime = result['time']
 
-            # race name, location; convert from unicode if necessary
-            racename = result.racename
-            outrec['race'] = racename
-            outrec['date'] = ftime.epoch2asc(e_racedate)
-            outrec['loc'] = result.raceloc
-            
-            # distance, category, time
-            distmiles = result.distmiles
-            distkm = result.distkm
-            if distkm is None or distkm < 0.050: continue # should already be filtered within ultrasignup, but just in case
-
-            outrec['miles'] = distmiles
-            outrec['km'] = distkm
-            resulttime = result.racetime
-
-            # int resulttime means DNF, most likely -- skip this result
-            if type(resulttime) == int: continue
-            
             # strange case of TicksString = ':00'
             if resulttime[0] == ':':
                 resulttime = '0'+resulttime
@@ -186,28 +203,19 @@ def collect(searchfile,outfile,begindate,enddate):
                 resulttime = '0:'+resulttime
             outrec['time'] = resulttime
 
-            # just leave out age grade if exception occurs
-            try:
-                agpercent,agresult,agfactor = ag.agegrade(racedateage,gender,distmiles,timeu.timesecs(resulttime))
-                outrec['ag'] = agpercent
-                if agpercent < 15 or agpercent >= 100: continue # skip obvious outliers
-            except:
-                pass
-
             OUT.writerow(outrec)
         
     _OUT.close()
     _IN.close()
     
     finish = time.time()
-    print 'number of URLs retrieved = {}'.format(ultra.geturlcount())
     print 'elapsed time (min) = {}'.format((finish-start)/60)
     
 ########################################################################
-class UltraSignupFileResult():
+class RunningAheadFileResult():
 ########################################################################
     '''
-    holds result from ultrasignup file
+    holds result from runningahead file
     
     :param firstname: first name
     :param lastname: last name
@@ -216,17 +224,15 @@ class UltraSignupFileResult():
     :param gender: M or F
     :param race: name of race
     :param date: date of race, datetime
-    :param loc: location of race
     :param age: age on race day
     :param miles: race distance, miles
     :param km: race distance, kilometers
     :param time: race time, seconds
-    :param ag: age grade percentage
     '''
-    attrs = 'firstname,lastname,name,dob,gender,race,date,loc,age,miles,km,time,ag'.split(',')
+    attrs = 'firstname,lastname,name,dob,gender,race,date,age,miles,km,time'.split(',')
     
     #----------------------------------------------------------------------
-    def __init__(self,firstname=None,lastname=None,name=None,dob=None,gender=None,race=None,date=None,loc=None,age=None,miles=None,km=None,time=None,ag=None):
+    def __init__(self,firstname=None,lastname=None,name=None,dob=None,gender=None,race=None,date=None,age=None,miles=None,km=None,time=None):
     #----------------------------------------------------------------------
         self.firstname = firstname
         self.lastname = lastname
@@ -235,12 +241,10 @@ class UltraSignupFileResult():
         self.gender = gender
         self.race = race
         self.date = date
-        self.loc = loc
         self.age = age
         self.miles = miles
         self.km = km
         self.time = time
-        self.ag = ag
         
     #----------------------------------------------------------------------
     def __repr__(self):
@@ -266,20 +270,19 @@ class UltraSignupFileResult():
         
         for attr,inval in attrvals:
             val = csvu.str2num(inval)
-            
             setattr(self,attr,val)
 
 ########################################################################
-class UltraSignupResultFile():
+class RunningAheadResultFile():
 ########################################################################
     '''
-    represents file of ultrasignup results collected from ultrasignup
+    represents file of runningahead results collected from runningahead
     
-    TODO:: add write methods, and update :func:`collect` to use :class:`UltraSignupFileResult` class
+    TODO:: add write methods, and update :func:`collect` to use :class:`RunningAheadFileResult` class
     '''
-    filehdr = 'GivenName,FamilyName,name,DOB,Gender,race,date,loc,age,miles,km,time,ag'.split(',')
-    # UltraSignupResultFile.filehdr needs to associate 1:1 with UltraSignupFileResult.attrs
-    hdrtransform = dict(zip(filehdr,UltraSignupFileResult.attrs))
+    filehdr = 'GivenName,FamilyName,name,DOB,Gender,race,date,age,miles,km,time'.split(',')
+    # RunningAheadResultFile.filehdr needs to associate 1:1 with RunningAheadFileResult.attrs
+    hdrtransform = dict(zip(filehdr,RunningAheadFileResult.attrs))
 
     resultdates = 'dob,date'.split(',')
 
@@ -292,7 +295,7 @@ class UltraSignupResultFile():
     def open(self,mode='rb'):
     #----------------------------------------------------------------------
         '''
-        open ultrasignup result file
+        open runningahead result file
         
         :param mode: 'rb' or 'wb' -- TODO: support 'wb'
         '''
@@ -309,7 +312,7 @@ class UltraSignupResultFile():
     def close(self):
     #----------------------------------------------------------------------
         '''
-        close ultrasignup result file
+        close runningahead result file
         '''
         if hasattr(self,'_fh'):
             self._fh.close()
@@ -320,9 +323,9 @@ class UltraSignupResultFile():
     def next(self):
     #----------------------------------------------------------------------
         '''
-        get next :class:`UltraSignupFileResult`
+        get next :class:`RunningAheadFileResult`
         
-        :rtype: :class:`UltraSignupFileResult`, or None when end of file reached
+        :rtype: :class:`RunningAheadFileResult`, or None when end of file reached
         '''
         try:
             fresult = self._csv.next()
@@ -346,13 +349,13 @@ class UltraSignupResultFile():
                 # convert numbers
                 aresultargs[aattr] = csvu.str2num(fresult[fattr])
                 
-        return UltraSignupFileResult(**aresultargs)
+        return RunningAheadFileResult(**aresultargs)
     
 #----------------------------------------------------------------------
 def main(): 
 #----------------------------------------------------------------------
     descr = '''
-    collect race results from ultrasignup
+    collect race results from runningahead
     
     searchfile must have at least the following headings:
     

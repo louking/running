@@ -183,11 +183,11 @@ def collect(searchfile,outfile,begindate,enddate):
 
             # race name, location; convert from unicode if necessary
             # TODO: make function to do unicode translation -- apply to runner name as well (or should csv just store unicode?)
-            racename = csvu.unicode2str(course['RaceName'])
-            coursename = csvu.unicode2str(course['Courses'][0]['CourseName'])
+            racename = csvu.unicode2ascii(course['RaceName'])
+            coursename = csvu.unicode2ascii(course['Courses'][0]['CourseName'])
             outrec['race'] = '{} / {}'.format(racename,coursename)
             outrec['date'] = ftime.epoch2asc(athlinks.gettime(course['RaceDate']))
-            outrec['loc'] = ucsvu.unicode2str(course['Home'])
+            outrec['loc'] = csvu.unicode2ascii(course['Home'])
             
             # distance, category, time
             distmiles = athlinks.dist2miles(course['Courses'][0]['DistUnit'],course['Courses'][0]['DistTypeID'])
