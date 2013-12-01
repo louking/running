@@ -41,6 +41,11 @@ setup(
     packages = find_packages(),
 #    include_package_data = True,
     scripts = [
+        'running/analyzeagegrade.py',
+        'running/athlinksresults.py',
+        'running/parseresults.py',
+        'running/runningaheadresults.py',
+        'running/ultrasignupresults.py',
     ],
 
     # Project uses reStructuredText, so ensure that the docutils get
@@ -62,6 +67,11 @@ setup(
 
     entry_points = {
         'console_scripts': [
+            'analyzeagegrade = running.analyzeagegrade:main',
+            'athlinksresults = running.athlinksresults:main',
+            'parseresults = running.parseresults:main',
+            'runningaheadresults = running.runningaheadresults:main',
+            'ultrasignupresults = running.ultrasignupresults:main',
         ],
     },
 
