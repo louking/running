@@ -78,20 +78,24 @@ class AgeGradeStat():
     :param time: time in seconds
     :param ag: age grade percentage (float, 0-100)
     :param race: race name
+    :param loc: location of race
     :param source: source of data
+    :param fuzzyage: 'Y' if age check was done based on age group rather than exact age, None otherwise
     :param priority: priority for deduplication, lowest value is kept (lower number = higher priority)
     '''
-    attrs = 'race,date,dist,time,ag,source,priority'.split(',')
+    attrs = 'race,date,loc,dist,time,ag,source,fuzzyage,priority'.split(',')
     
     #-------------------------------------------------------------------------------
-    def __init__(self,date=None,dist=None,time=None,ag=None,race=None,source=None,priority=1):
+    def __init__(self,date=None,dist=None,time=None,ag=None,race=None,loc=None,source=None,fuzzyage=None,priority=1):
     #-------------------------------------------------------------------------------
         self.date = date
         self.dist = dist
         self.time = time
         self.ag = ag
         self.race = race
+        self.loc = loc
         self.source = source
+        self.fuzzyage = fuzzyage
         self.priority = priority
         
     #-------------------------------------------------------------------------------
@@ -175,7 +179,7 @@ class AnalyzeAgeGrade():
         self.dists = set([])
 
     #-------------------------------------------------------------------------------
-    def add_stat(self, date, dist, time, race=None, source=None, priority=None):
+    def add_stat(self, date, dist, time, **kwargs):
     #-------------------------------------------------------------------------------
         '''
         add an individual statistic
@@ -183,10 +187,10 @@ class AnalyzeAgeGrade():
         :param date: date in datetime format
         :param dist: distance in meters
         :param time: time in seconds
-        :param race: race name
+        :param kwargs: keyword arguments, must match AgeGradeState attrs
         '''
         
-        self.stats.append(AgeGradeStat(date,dist,time,race=race,source=source,priority=priority))
+        self.stats.append(AgeGradeStat(date,dist,time,**kwargs))
         self.dists.add(round(dist))
         
     #-------------------------------------------------------------------------------

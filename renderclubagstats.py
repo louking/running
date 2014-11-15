@@ -112,11 +112,12 @@ def collectathlinks(aag,athlinksfile):
     athlf.open()
     
     # read records from athlinksfile
-    # records are assumed to be sorted by individual
-    # gather each individual's result statistics, then render the result statistics for that individual
-    result = athlf.next()
-    thisname = result.name
+    # gather each individual's result statistics, render later
     while True:
+        result = athlf.next()
+        if result is None: break
+        
+        thisname = result.name.lower()
 
         # initialize aag data structure, if not already done
         initaagrunner(aag,thisname,result.gender,result.dob)
@@ -124,19 +125,10 @@ def collectathlinks(aag,athlinksfile):
         # collect this result
         timesecs = timeu.timesecs(result.resulttime)
         if timesecs > 0:
-            aag[thisname].add_stat(result.racedate,result.distkm*1000,timesecs,race=result.racename,source='athlinks',priority=PRIO_ATHLINKS)
-        
-        # if we've completed the last runner's result collection,
-        # render the results, and set up for the next runner
-        result = athlf.next()
-            
-        # are we done?
-        if result is None:
-            break
-        
-        # not done, but maybe we have a new runner
-        thisname = result.name
-            
+            aag[thisname].add_stat(result.racedate,result.distkm*1000,timesecs,race=result.racename,
+                                   loc=result.raceloc,fuzzyage=result.fuzzyage,
+                                   source='athlinks',priority=PRIO_ATHLINKS)
+
 #----------------------------------------------------------------------
 def collectultrasignup(aag,ultrasignupfile):
 #----------------------------------------------------------------------
@@ -151,11 +143,12 @@ def collectultrasignup(aag,ultrasignupfile):
     ultra.open()
     
     # read records from ultrasignupfile
-    # records are assumed to be sorted by individual
-    # gather each individual's result statistics, then render the result statistics for that individual
-    result = ultra.next()
-    thisname = result.name
+    # gather each individual's result statistics, render later
     while True:
+        result = ultra.next()
+        if result is None: break
+        
+        thisname = result.name.lower()
 
         # initialize aag data structure, if not already done
         initaagrunner(aag,thisname,result.gender,result.dob)
@@ -163,19 +156,9 @@ def collectultrasignup(aag,ultrasignupfile):
         # collect this result
         timesecs = timeu.timesecs(result.time)
         if timesecs > 0:
-            aag[thisname].add_stat(result.date,result.km*1000,timesecs,race=result.race,source='ultrasignup',priority=PRIO_ULTRASIGNUP)
-        
-        # if we've completed the last runner's result collection,
-        # render the results, and set up for the next runner
-        result = ultra.next()
-            
-        # are we done?
-        if result is None:
-            break
-        
-        # not done, but maybe we have a new runner
-        thisname = result.name
-            
+            aag[thisname].add_stat(result.date,result.km*1000,timesecs,race=result.race,
+                                   loc=result.loc,source='ultrasignup',priority=PRIO_ULTRASIGNUP)
+
 #----------------------------------------------------------------------
 def collectrunningahead(aag,runningaheadfile):
 #----------------------------------------------------------------------
@@ -190,11 +173,12 @@ def collectrunningahead(aag,runningaheadfile):
     rafile.open()
     
     # read records from runningaheadfile
-    # records are assumed to be sorted by individual
-    # gather each individual's result statistics, then render the result statistics for that individual
-    result = rafile.next()
-    thisname = result.name
+    # gather each individual's result statistics, render later
     while True:
+        result = rafile.next()
+        if result is None: break
+        
+        thisname = result.name.lower()
 
         # initialize aag data structure, if not already done
         initaagrunner(aag,thisname,result.gender,result.dob)
@@ -204,17 +188,6 @@ def collectrunningahead(aag,runningaheadfile):
         if timesecs > 0:
             aag[thisname].add_stat(result.date,result.km*1000,timesecs,race=result.race,source='runningahead',priority=PRIO_RUNNINGAHEAD)
         
-        # if we've completed the last runner's result collection,
-        # render the results, and set up for the next runner
-        result = rafile.next()
-            
-        # are we done?
-        if result is None:
-            break
-        
-        # not done, but maybe we have a new runner
-        thisname = result.name
-            
 #----------------------------------------------------------------------
 def collectclub(aag,clubfile):
 #----------------------------------------------------------------------
@@ -243,19 +216,8 @@ def collectclub(aag,clubfile):
             self.ag = float(ag)
     
     # read records from clubfile
-    # gather each individual's result statistics, then render the result statistics for that individual
-    row = clubf.next()
-    result = ClubResult(row['name'],row['dob'],row['gender'],row['race'],row['date'],row['miles'],row['km'],row['time'],row['ag'])
-    thisname = result.name
+    # gather each individual's result statistics, render later
     while True:
-        # initialize aag data structure, if not already done
-        initaagrunner(aag,thisname,result.gender,result.dob)
-    
-        # collect this result
-        timesecs = result.resulttime
-        if timesecs > 0:
-            aag[thisname].add_stat(result.racedate,result.distkm*1000,timesecs,race=result.racename,source='clubraces',priority=PRIO_CLUBRACES)
-        
         # if we've completed the last runner's result collection,
         # render the results, and set up for the next runner
         try:
@@ -265,11 +227,18 @@ def collectclub(aag,clubfile):
             result = None
             
         # are we done?
-        if result is None:
-            break
+        if result is None: break
         
-        # not done, but maybe we have a new runner
-        thisname = result.name
+        thisname = result.name.lower()
+
+        # initialize aag data structure, if not already done
+        initaagrunner(aag,thisname,result.gender,result.dob)
+    
+        # collect this result
+        timesecs = result.resulttime
+        if timesecs > 0:
+            aag[thisname].add_stat(result.racedate,result.distkm*1000,timesecs,race=result.racename,source='clubraces',priority=PRIO_CLUBRACES)
+        
             
 #----------------------------------------------------------------------
 def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begindate,enddate):
@@ -317,6 +286,8 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
     
     # loop through each member we've recorded information about
     for thisname in aag:
+        rendername = thisname.title()
+        
         # remove duplicate entries
         aag[thisname].deduplicate()   
         
@@ -329,7 +300,7 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
         
         # write detailed file before filtering
         name,gender,dob = aag[thisname].get_runner()
-        detlout = {'name':name,'gender':gender,'dob':tfile.dt2asc(dob)}
+        detlout = {'name':rendername,'gender':gender,'dob':tfile.dt2asc(dob)}
         for stat in stats:
             for attr in analyzeagegrade.AgeGradeStat.attrs:
                 detlout[attr] = getattr(stat,attr)
@@ -346,6 +317,9 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
             
         jan1 = tfile.asc2dt('{}-1-1'.format(lastyear))
         runnerage = timeu.age(jan1,dob)
+        
+        # filter out runners younger than 14
+        if runnerage < 14: continue
 
         # filter out runners who have not run enough races
         stats = aag[thisname].get_stats()
@@ -354,77 +328,79 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
         else:
             lastyear = timeu.epoch2dt(time.time()).year
         lastyearstats = [s for s in stats if s.date.year==lastyear]
+        if len(lastyearstats) < minraces: continue
         
         # set up output file name template
         if outfile:
             aag[thisname].set_renderfname(outfile)
 
+        # set up rendering parameters
+        aag[thisname].set_xlim(begindate,enddate)
+        aag[thisname].set_ylim(minagegrade,100)
+        aag[thisname].set_colormap([200,100*METERSPERMILE])
+
+        # clear figure, set up axes
+        fig.clear()
+        ax = fig.add_subplot(111)
+        
+        # render the results
+        aag[thisname].render_stats(fig)    # plot statistics
+
+        # set up to collect averages
         avg = collections.OrderedDict()
-        if len(lastyearstats) >= minraces:
-            # set up rendering parameters
-            aag[thisname].set_xlim(begindate,enddate)
-            aag[thisname].set_ylim(minagegrade,100)
-            aag[thisname].set_colormap([200,100*METERSPERMILE])
 
-            # clear figure, set up axes
-            fig.clear()
-            ax = fig.add_subplot(111)
-            
-            # render the results
-            aag[thisname].render_stats(fig)    # plot statistics
+        # draw trendlines, write output
+        allstats = aag[thisname].get_stats()
+        avg['overall'] = mean([s.ag for s in allstats])
+        trend = aag[thisname].render_trendline(fig,'overall',color='k')
 
-            # draw trendlines, write output
-            allstats = aag[thisname].get_stats()
-            avg['overall'] = mean([s.ag for s in allstats])
-            trend = aag[thisname].render_trendline(fig,'overall',color='k')
-
-            # retrieve output filename for hyperlink
-            # must be called after set_runner and set_renderfname
-            thisoutfile = aag[thisname].get_outfilename()
-           
-            summout = {}
-            summout['name'] = '=HYPERLINK("{}","{}")'.format(thisoutfile,thisname)
-            summout['age'] = runnerage
-            summout['gender'] = gender
-            summout['agegrade\noverall'] = avg['overall']
-            if len(allstats) >= mintrend:
-                summout['trend\noverall'] = trend.slope
-                summout['stderr\noverall'] = trend.stderr
-                summout['r-squared\noverall'] = trend.rvalue**2
-                summout['pvalue\noverall'] = trend.pvalue
-            summout['numraces\noverall'] = len(allstats)
-            for year in yearrange:
-                summout['numraces\n{}'.format(year)] = len([s for s in allstats if s.date.year==year])
-            for tlimit in TRENDLIMITS:
-                distcategory,distcolor = TRENDLIMITS[tlimit]
-                tstats = [s for s in allstats if s.dist >= tlimit[0] and s.dist <= tlimit[1]]
-                if len(tstats) < mintrend: continue
-                avg[distcategory] = mean([s.ag for s in tstats])
-                trend = aag[thisname].render_trendline(fig,distcategory,thesestats=tstats,color=distcolor)
-                
-                summout['agegrade\n{}'.format(distcategory)] = avg[distcategory]
-                summout['trend\n{}'.format(distcategory)] = trend.slope
-                summout['stderr\n{}'.format(distcategory)] = trend.stderr
-                summout['r-squared\n{}'.format(distcategory)] = trend.rvalue**2
-                summout['pvalue\n{}'.format(distcategory)] = trend.pvalue
-                summout['numraces\n{}'.format(distcategory)] = len(tstats)
-            SUMM.writerow(summout)
+        # retrieve output filename for hyperlink
+        # must be called after set_runner and set_renderfname
+        thisoutfile = aag[thisname].get_outfilename()
+       
+        summout = {}
+        summout['name'] = '=HYPERLINK("{}","{}")'.format(thisoutfile,rendername)
+        summout['age'] = runnerage
+        summout['gender'] = gender
+        summout['agegrade\noverall'] = avg['overall']
+        if len(allstats) >= mintrend:
+            summout['trend\noverall'] = trend.slope
+            summout['stderr\noverall'] = trend.stderr
+            summout['r-squared\noverall'] = trend.rvalue**2
+            summout['pvalue\noverall'] = trend.pvalue
+        summout['numraces\noverall'] = len(allstats)
+        for year in yearrange:
+            summout['numraces\n{}'.format(year)] = len([s for s in allstats if s.date.year==year])
+        for tlimit in TRENDLIMITS:
+            distcategory,distcolor = TRENDLIMITS[tlimit]
+            tstats = [s for s in allstats if s.dist >= tlimit[0] and s.dist <= tlimit[1]]
+            if len(tstats) < mintrend: continue
+            avg[distcategory] = mean([s.ag for s in tstats])
+            trend = aag[thisname].render_trendline(fig,distcategory,thesestats=tstats,color=distcolor)
             
-            # annotate with averages
-            avgstr = 'averages\n'
-            for lab in avg:
-                thisavg = int(round(avg[lab]))
-                avgstr += '  {}: {}%\n'.format(lab,thisavg)
-            avgstr += 'age (1/1/{}): {}'.format(lastyear,runnerage)
-            
-            # TODO: add get_*lim() to aag -- xlim and ylim are currently side-effect of aag.render_stats()
-            x1,xn = ax.get_xlim()
-            y1,yn = ax.get_ylim()
-            xy = (x1+10,y1+10)
-            aag[thisname].render_annotate(fig,avgstr,xy)
-            
-            # save file
-            aag[thisname].save(fig)
+            summout['agegrade\n{}'.format(distcategory)] = avg[distcategory]
+            summout['trend\n{}'.format(distcategory)] = trend.slope
+            summout['stderr\n{}'.format(distcategory)] = trend.stderr
+            summout['r-squared\n{}'.format(distcategory)] = trend.rvalue**2
+            summout['pvalue\n{}'.format(distcategory)] = trend.pvalue
+            summout['numraces\n{}'.format(distcategory)] = len(tstats)
+        SUMM.writerow(summout)
+        
+        # annotate with averages
+        avgstr = 'averages\n'
+        for lab in avg:
+            thisavg = int(round(avg[lab]))
+            avgstr += '  {}: {}%\n'.format(lab,thisavg)
+        avgstr += 'age (1/1/{}): {}'.format(lastyear,runnerage)
+        
+        # TODO: add get_*lim() to aag -- xlim and ylim are currently side-effect of aag.render_stats()
+        x1,xn = ax.get_xlim()
+        y1,yn = ax.get_ylim()
+        xy = (x1+10,y1+10)
+        aag[thisname].render_annotate(fig,avgstr,xy)
+        
+        # save file
+        aag[thisname].save(fig)
          
     _SUMM.close()
     _DETL.close()

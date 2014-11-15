@@ -86,8 +86,8 @@ ag = agegrade.AgeGrade()
 class invalidParameter(Exception): pass
 
 # resultfilehdr needs to associate 1:1 with resultattrs
-resultfilehdr = 'GivenName,FamilyName,name,DOB,Gender,athlmember,athlid,race,date,loc,age,miles,km,category,time,ag'.split(',')
-resultattrs = 'firstname,lastname,name,dob,gender,member,id,racename,racedate,raceloc,age,distmiles,distkm,racecategory,resulttime,resultagegrade'.split(',')
+resultfilehdr = 'GivenName,FamilyName,name,DOB,Gender,athlmember,athlid,race,date,loc,age,fuzzyage,miles,km,category,time,ag'.split(',')
+resultattrs = 'firstname,lastname,name,dob,gender,member,id,racename,racedate,raceloc,age,fuzzyage,distmiles,distkm,racecategory,resulttime,resultagegrade'.split(',')
 resultdates = 'dob,racedate'.split(',')
 hdrtransform = dict(zip(resultfilehdr,resultattrs))
 ftime = timeu.asctime('%Y-%m-%d')
@@ -135,9 +135,9 @@ def collect(searchfile,outfile,begindate,enddate):
         e_dob = ftime.asc2epoch(runner['DOB'])
         dt_dob = ftime.asc2dt(runner['DOB'])
         
-        # skip getting results if participant too young
-        todayage = timeu.age(today,dt_dob)
-        if todayage < 14: continue
+        ## skip getting results if participant too young
+        #todayage = timeu.age(today,dt_dob)
+        #if todayage < 14: continue
         
         # get results for this athlete
         results = athl.listathleteresults(name)
@@ -149,10 +149,29 @@ def collect(searchfile,outfile,begindate,enddate):
             # skip result if outside the desired time window
             if e_racedate < begindate or e_racedate > enddate: continue
             
+            # create output record and copy common fields
+            outrec = {}
+            for field in commonfields:
+                outrec[field] = runner[field]
+                
             # skip result if runner's age doesn't match the age within the result
+            # sometimes athlinks stores the age group of the runner, not exact age,
+            # so also check if this runner's age is within the age group, and indicate if so
             dt_racedate = timeu.epoch2dt(e_racedate)
             racedateage = timeu.age(dt_racedate,dt_dob)
-            if result['Age'] != racedateage: continue
+            resultage = int(result['Age'])
+            if resultage != racedateage:
+                # if results are not stored as age group, skip this result
+                if (resultage/5)*5 != resultage:
+                    continue
+                # result's age might be age group, not exact age
+                else:
+                    # if runner's age consistent with race age, use result, but mark "fuzzy"
+                    if (racedateage/5)*5 == resultage:
+                        outrec['fuzzyage'] = 'Y'
+                    # otherwise skip result
+                    else:
+                        continue
             
             # skip result if runner's gender doesn't match gender within the result
             resultgen = result['Gender'][0]
@@ -165,11 +184,6 @@ def collect(searchfile,outfile,begindate,enddate):
             thiscategory = course['Courses'][0]['RaceCatID']
             if thiscategory not in race_category: continue
             
-            # create output record and copy common fields
-            outrec = {}
-            for field in commonfields:
-                outrec[field] = runner[field]
-                
             # fill in output record fields from runner, result, course
             # combine name, get age
             outrec['name'] = '{} {}'.format(runner['GivenName'],runner['FamilyName'])

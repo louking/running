@@ -128,9 +128,9 @@ def collect(searchfile,outfile,begindate,enddate):
         dt_dob = ftime.asc2dt(runner['DOB'])
         gender = runner['Gender'][0]
         
-        # skip getting results if participant too young
-        todayage = timeu.age(today,dt_dob)
-        if todayage < 14: continue
+        ## skip getting results if participant too young
+        #todayage = timeu.age(today,dt_dob)
+        #if todayage < 14: continue
         
         # get results for this athlete
         results = ultra.listresults(fname,lname)

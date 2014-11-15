@@ -69,7 +69,7 @@ log = logging.getLogger('running.ultrasignup')
 log.setLevel(logging.DEBUG)
 
 # pypi
-from IPython.core.debugger import Tracer; debug_here = Tracer()
+#from IPython.core.debugger import Tracer; debughere = Tracer(); debughere() # set breakpoint where needed
 
 # github
 
@@ -160,9 +160,9 @@ def collect(searchfile,outfile,begindate,enddate):
         # if we couldn't find this member in RA, try the next member
         if not foundmember: continue
         
-        # skip getting results if participant too young
-        todayage = timeu.age(today,dt_dob)
-        if todayage < 14: continue
+        ## skip getting results if participant too young
+        #todayage = timeu.age(today,dt_dob)
+        #if todayage < 14: continue
         
         # if we're here, found the right user, now let's look at the workouts
         workouts = ra.listworkouts(user['token'],begindate=dt_begindate,enddate=dt_enddate,getfields=FIELD['workout'].keys())
