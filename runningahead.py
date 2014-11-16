@@ -213,9 +213,12 @@ class RunningAhead():
         # fill in optional arguments as needed
         optargs = {}
         optargs['activityID'] = 10  # Run
-        if begindate: optargs['beginDate'] = begindate
-        if enddate:   optargs['endDate']   = enddate
+        filters = []
+        if begindate: filters.append(['date','ge',begindate])
+        if enddate:   filters.append(['date','le',enddate])
         if getfields: optargs['fields']    = fields
+        if filters:
+            optargs['filters'] = filters
         
         # max number of workouts in workout list is 100, so need to loop, collecting
         # BITESIZE workouts at a time.  These are all added to workouts list, and final
@@ -271,7 +274,17 @@ class RunningAhead():
         """
         
         data = self._raget('users/me',accesstoken)
-        user = data['user']
+        rauser = data['user']
+        
+        # flatten user structure, as expected by caller
+        user = {}
+        for raf in rauser:
+            if type(rauser[raf]) == dict:
+                for f in rauser[raf]:
+                    user[f] = rauser[raf][f]
+            else:
+                user[raf] = rauser[raf]
+                
         return user
         
     #----------------------------------------------------------------------
@@ -292,13 +305,13 @@ class RunningAhead():
         resp,jsoncontent = self.http.request(url)
         
         if resp.status != 200:
-            raise accessError, 'URL response status = {0}'.format(resp.status)
+            raise accessError, 'URL response status={}, url={}'.format(resp.status,url)
         
         # unmarshall the response content
         content = json.loads(jsoncontent)
         
         if content['code'] != 0:
-            raise accessError, 'RA response code = {0}'.format(content['code'])
+            raise accessError, 'RA response code={}, url={}'.format(content['code'],url)
     
         data = content['data']
         return data 

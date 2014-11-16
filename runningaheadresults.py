@@ -87,7 +87,7 @@ import version
 ag = agegrade.AgeGrade()
 class invalidParameter(Exception): pass
 
-ftime = timeu.asctime('%Y-%m-%d')
+fdate = timeu.asctime('%Y-%m-%d')
 METERSPERMILE = 1609.344
 
 #----------------------------------------------------------------------
@@ -124,11 +124,13 @@ def collect(searchfile,outfile,begindate,enddate):
 
     # reset begindate to beginning of day, enddate to end of day
     dt_begindate = timeu.epoch2dt(begindate)
+    a_begindate = fdate.dt2asc(dt_begindate)
     adj_begindate = datetime.datetime(dt_begindate.year,dt_begindate.month,dt_begindate.day,0,0,0)
-    begindate = timeu.dt2epoch(adj_begindate)
+    e_begindate = timeu.dt2epoch(adj_begindate)
     dt_enddate = timeu.epoch2dt(enddate)
+    a_enddate = fdate.dt2asc(dt_enddate)
     adj_enddate = datetime.datetime(dt_enddate.year,dt_enddate.month,dt_enddate.day,23,59,59)
-    enddate = timeu.dt2epoch(adj_enddate)
+    e_enddate = timeu.dt2epoch(adj_enddate)
     
     # get today's date for high level age filter
     start = time.time()
@@ -139,8 +141,8 @@ def collect(searchfile,outfile,begindate,enddate):
         fname,lname = runner['GivenName'],runner['FamilyName']
         membername = '{} {}'.format(fname,lname)
         log.debug('looking for {}'.format(membername))
-        e_dob = ftime.asc2epoch(runner['DOB'])
-        dt_dob = ftime.asc2dt(runner['DOB'])
+        e_dob = fdate.asc2epoch(runner['DOB'])
+        dt_dob = fdate.asc2dt(runner['DOB'])
         dob = runner['DOB']
         gender = runner['Gender'][0]
 
@@ -151,7 +153,7 @@ def collect(searchfile,outfile,begindate,enddate):
             givenName = rauser['givenName'] if 'givenName' in rauser else ''
             familyName = rauser['familyName'] if 'familyName' in rauser else ''
             rausername = '{} {}'.format(givenName,familyName)
-            if rausername == membername and dt_dob == ftime.asc2dt(rauser['birthDate']):
+            if rausername == membername and dt_dob == fdate.asc2dt(rauser['birthDate']):
                 foundmember = True
                 log.debug('found {}'.format(membername))
                 break
@@ -165,15 +167,16 @@ def collect(searchfile,outfile,begindate,enddate):
         #if todayage < 14: continue
         
         # if we're here, found the right user, now let's look at the workouts
-        workouts = ra.listworkouts(user['token'],begindate=dt_begindate,enddate=dt_enddate,getfields=FIELD['workout'].keys())
+        workouts = ra.listworkouts(user['token'],begindate=a_begindate,enddate=a_enddate,getfields=FIELD['workout'].keys())
 
         # save race workouts, if any found
         results = []
         if workouts:
             for wo in workouts:
                 if wo['workoutName'].lower() != 'race': continue
+                if 'duration' not in wo['details']: continue        # seen once, not sure why
                 thisdate = wo['date']
-                dt_thisdate = ftime.asc2dt(thisdate)
+                dt_thisdate = fdate.asc2dt(thisdate)
                 thisdist = runningahead.dist2meters(wo['details']['distance'])
                 thistime = wo['details']['duration']
                 thisrace = wo['course']['name'] if wo.has_key('course') else 'unknown'
@@ -187,7 +190,7 @@ def collect(searchfile,outfile,begindate,enddate):
         
         # loop through each result
         for result in results:
-            e_racedate = ftime.asc2epoch(result['date'])
+            e_racedate = fdate.asc2epoch(result['date'])
             
             # skip result if outside the desired time window
             if e_racedate < begindate or e_racedate > enddate: continue
@@ -253,7 +256,7 @@ class RunningAheadFileResult():
         for attr in self.attrs:
             val = getattr(self,attr)
             if attr in ['dob','date']:
-                val = ftime.dt2asc(val)
+                val = fdate.dt2asc(val)
             reprval += '{}={},'.format(attr,val)
         reprval = reprval[:-1]
         reprval += ')'
@@ -343,7 +346,7 @@ class RunningAheadResultFile():
                 
             # special handling for dates
             elif aattr in self.resultdates:
-                aresultargs[aattr] = ftime.asc2dt(fresult[fattr])
+                aresultargs[aattr] = fdate.asc2dt(fresult[fattr])
                 
             else:
                 # convert numbers
