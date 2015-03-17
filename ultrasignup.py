@@ -6,7 +6,7 @@
 #   ----        ------      ------
 #   11/23/13    Lou King    Create
 #
-#   Copyright 2013 Lou King
+#   Copyright 2013,2014 Lou King
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import urllib
 from lxml import etree
 import unicodedata
 import logging
+import json
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s')
 
 # pypi
@@ -50,32 +51,27 @@ from runningclub import render
 from running import accessError, parameterError
 
 # access stuff
-ULTRASIGNUP_URL = 'http://www.ultrasignup.com'
-RESULTS_SEARCH = 'results_participant.aspx'
-NUMULTRASIGNUPCOLS = 7
+ULTRASIGNUP_URL = 'http://ultrasignup.com'
+RESULTS_SEARCH = 'service/events.svc/history/{fname}/{lname}'
 
 HTTPTIMEOUT = 10
 MPERMILE = 1609.344
 
-tindate  = timeu.asctime('%b %d, %Y')
+tindate  = timeu.asctime('%m/%d/%Y %I:%M:%S %p')
 toutdate = timeu.asctime('%Y-%m-%d')
 
 #----------------------------------------------------------------------
-def racenameanddist(el):
+def racenameanddist(eventname):
 #----------------------------------------------------------------------
     '''
     get race name and distance from etree element
     
-    :param el: element from last column of untrasignup.com
+    :param eventname: eventname from untrasignup.com
     :rtype: racename, distmiles, distkm
     '''
 
-    # one child, a link
-    linkel = el.getchildren()[0]
-    
-    # but all we need is the text, formatted as
-    # <racename> - <dist><units>
-    racetext = linkel.text.strip()
+    # eventname is formatted as <racename> - <dist><units>
+    racetext = eventname.strip()
     fields = racetext.split('-')
     
     # include distance in racename, as sometimes it's missing
@@ -93,15 +89,24 @@ def racenameanddist(el):
         startunits += 1
     
     # pull out the units from the distance field, and interpret
-    units = distfield[startunits:]
+    units = distfield[startunits:].strip()
     
+    # special cases
+    if distfield == 'Marathon':
+        distmiles = 26.21875    # true marathon
+        distkm = distmiles * (MPERMILE/1000)
+        
+    elif distfield == '1/2 Marathon':
+        distmiles = 13.109375   # true half marathon
+        distkm = distmiles * (MPERMILE/1000)
+        
     # kilometers
-    if units == 'KM':
+    elif units == 'K':
         distkm = dist 
         distmiles = (dist * 1000) / MPERMILE
     
     # miles
-    elif units == 'M':
+    elif units == 'Miler':
         # some special cases
         if dist == 13:
             distmiles = 13.109375   # true half marathon
@@ -118,21 +123,17 @@ def racenameanddist(el):
     return racename,distmiles,distkm
 
 #----------------------------------------------------------------------
-def racenameanddur(el):
+def racenameanddur(eventname):
 #----------------------------------------------------------------------
     '''
     get race name and duration from etree element
     
-    :param el: element from last column of untrasignup.com
+    :param eventname: eventname from untrasignup.com
     :rtype: racename, duration
     '''
 
-    # one child, a link
-    linkel = el.getchildren()[0]
-    
-    # but all we need is the text, formatted as
-    # <racename> - <dist><units>
-    racetext = linkel.text.strip()
+    # eventname is formatted as <racename> - <dist><units>
+    racetext = eventname.strip()
     fields = racetext.split('-')
     
     # include distance in racename, as sometimes it's missing
@@ -152,8 +153,8 @@ def racenameanddur(el):
     # pull out the units from the durance field, and interpret
     units = durfield[startunits:]
     
-    # kilometers
-    if units == 'HRS':
+    # hours
+    if units == 'hrs':
         duration = dur
     
     else:
@@ -171,6 +172,7 @@ class UltraSignupResult():
     :param oaplace: overall place
     :param genplace: gender place
     :param age: age on race day
+    :param gender: gender
     :param racetime: finishing time h:mm:ss
     :param racedate: date of race yyyy-mm-dd
     :param raceloc: location of race
@@ -178,19 +180,22 @@ class UltraSignupResult():
     :param distmiles: distance in miles
     :param distkm: distance in kilometers
     '''
-    # these are the attributes of UltraSignupResult which are in the same order
-    # as the table coming from ultrasignup.com.
-    # The remaining attributes, racename, distmiles, distkm are handled individually
-    # based on the last column of the table from ultrasignup.com
-    attrs = 'ranking,oaplace,genplace,age,racetime,racedate,raceloc,racename,distmiles,distkm'.split(',')
+    # us_event_attrs are within the json response from ultrasignup.com
+    # attrs must be in the same order
+    # loop needs to be driven by us_event_attrs because it's shorter than output attrs
+    # racename and distance fields are determined from parsing of 'eventname' from ultrasignup.com
+    # gender comes from the outer list returned by ultrasignup
+    us_event_attrs = 'runner_rank,place,gender_place,age,time,eventdate,eventlocation'.split(',')    
+    attrs = 'ranking,oaplace,genplace,age,racetime,racedate,raceloc,racename,distmiles,distkm,gender'.split(',')
     
     #----------------------------------------------------------------------
-    def __init__(self,ranking=None,oaplace=None,genplace=None,age=None,racetime=None,racedate=None,raceloc=None,racename=None,distmiles=None,distkm=None):
+    def __init__(self,ranking=None,oaplace=None,genplace=None,age=None,gender=None,racetime=None,racedate=None,raceloc=None,racename=None,distmiles=None,distkm=None):
     #----------------------------------------------------------------------
         self.ranking = ranking
         self.oaplace = oaplace
         self.genplace = genplace
         self.age = age
+        self.gender = gender
         self.racetime = racetime
         self.racedate = racedate
         self.raceloc = raceloc
@@ -287,52 +292,51 @@ class UltraSignup():
         
         # get the data for this athlete
         races = []
-        data = self._get(RESULTS_SEARCH,
-                           fname=fname,
-                           lname=lname
+        data = self._get(RESULTS_SEARCH.format(
+                           fname=urllib.quote(fname),
+                           lname=urllib.quote(lname))
                            )
         
-        doc = etree.HTML(data)
-        for el in doc.iter():
-            if el.tag == 'table':
-                table = el
-                break
-            
+        content = json.loads(data)
+        
         results = []
         
         # iterate through the rows of the table
-        rows = iter(table)
-        
-        # for each row in the table, grab the row and associate with the attributes
-        rownum = 0
-        while True:
-            try:
-                row = next(rows)
-                rownum += 1
-                # skip first two rows (colgroup,heading)
-                if rownum <= 2: continue
-            except StopIteration:
-                break
-
-            cols = [c.text for c in row]
-            # skip runner identification
-            if len(cols) < NUMULTRASIGNUPCOLS: continue
+        # content contains a list with an entry for each runner of the same name
+        for runner in content:
+            usresults = runner['Results']
+            gender = runner['Gender']
             
-            result = UltraSignupResult()
-            result.set(zip(UltraSignupResult.attrs,cols))
-            result.racename,result.distmiles,result.distkm = racenameanddist(row[-1])
-            
-            # distmiles == None if this was a gimed race.  result.racetime has distance in miles
-            if result.distmiles == None:
-                result.racename,duration = racenameanddur(row[-1])
-                if duration is None: continue   # didn't recognize units
+            # for each row in the table, grab the row and associate with the attributes
+            for usresult in usresults:
                 
-                result.distmiles = result.racetime
-                result.distkm = result.distmiles * (MPERMILE/1000)
-                # this is in hours so should render correctly
-                result.racetime = render.rendertime(duration*60*60.0,0)
-            
-            results.append(result)
+                # seems like anything other than 1 is not good
+                if usresult['status'] != 1: continue
+                
+                # pull out values from row, in same order as UltraSignupResult.attrs
+                vals = []
+                for a in UltraSignupResult.us_event_attrs:
+                    vals.append(usresult[a])
+                
+                # zip values into result and parse event name to get name and distances
+                result = UltraSignupResult()
+                result.set(zip(UltraSignupResult.attrs,vals))
+                result.racename,result.distmiles,result.distkm = racenameanddist(usresult['eventname'])
+                
+                # distmiles == None if this was a timed race.  result.racetime has distance in miles
+                if result.distmiles == None:
+                    result.racename,duration = racenameanddur(usresult['eventname'])
+                    if duration is None: continue   # didn't recognize units
+                    
+                    result.distmiles = result.racetime
+                    result.distkm = result.distmiles * (MPERMILE/1000)
+                    # this is in hours so should render correctly
+                    result.racetime = render.rendertime(duration*60*60.0,0)
+                
+                # gender comes from outer runner list
+                result.gender = gender
+                
+                results.append(result)
             
         def _checkfilter(check):
             for key in filt:

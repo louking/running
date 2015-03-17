@@ -65,7 +65,7 @@ import datetime
 import time
 
 # pypi
-from IPython.core.debugger import Tracer; debug_here = Tracer()
+#from IPython.core.debugger import Tracer; debug_here = Tracer()
 
 # github
 
@@ -147,9 +147,9 @@ def collect(searchfile,outfile,begindate,enddate):
             racedateage = timeu.age(dt_racedate,dt_dob)
             if result.age != racedateage: continue
             
-            # assume gender is correct -- TODO: fix ultrasignup to extract gender into UltraSignupResult instance
-            #resultgen = result.gender
-            #if resultgen != runner['Gender'][0]: continue
+            # skip result if runner's gender doesn't match gender within the result
+            resultgen = result.gender
+            if resultgen != runner['Gender'][0]: continue
             
             # create output record and copy common fields
             outrec = {}
