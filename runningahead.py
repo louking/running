@@ -288,6 +288,43 @@ class RunningAhead():
         return user
         
     #----------------------------------------------------------------------
+    def listmembers(self,club,**filters):
+    #----------------------------------------------------------------------
+        """
+        return list of club members
+        
+        :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
+        :rtype: list of members
+        """
+        
+        
+        # max number of workouts in workout list is 100, so need to loop, collecting
+        # BITESIZE workouts at a time.  These are all added to workouts list, and final
+        # list is returned to the caller
+        members = []
+        while True:
+            data = self._raget('clubs/{}/members'.format(club),
+                               self.client_credentials,
+                               **filters
+                               )
+            if data['numEntries'] == 0:
+                break
+            
+            thesemembers = data['entries']
+            members += thesemembers
+            offset += BITESIZE
+
+            # stop iterating if we've reached the end of the data
+            if offset >= data['numEntries']:
+                break
+        
+        # here would be a fine place to operate on an optional filter parameter.
+        # only problem with that is every time I do that I make the filter parameter
+        # so complex that I can never figure it out myself
+        
+        return members  
+        
+    #----------------------------------------------------------------------
     def _raget(self,method,accesstoken,**params):
     #----------------------------------------------------------------------
         """
