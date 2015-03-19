@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # ##########################################################################################
-#	parserun.py  -- parse run from garmin training center
+#	parseresults.py  -- parse run from garmin training center
 #
 #	Date		Author		Reason
 #	----		------		------
