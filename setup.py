@@ -43,6 +43,7 @@ setup(
     scripts = [
         'running/analyzeagegrade.py',
         'running/athlinksresults.py',
+        'running/competitor2csv.py',
         'running/parseresults.py',
         'running/renderclubagstats.py',
         'running/runningaheadresults.py',
@@ -70,6 +71,7 @@ setup(
         'console_scripts': [
             'analyzeagegrade = running.analyzeagegrade:main',
             'athlinksresults = running.athlinksresults:main',
+            'competitor2csv = running.competitor2csv:main',
             'parseresults = running.parseresults:main',
             'renderclubagstats = running.renderclubagstats:main',
             'runningaheadresults = running.runningaheadresults:main',
