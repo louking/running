@@ -1,6 +1,6 @@
 #!/usr/bin/python
 ###########################################################################################
-# members -- class pulls in individual memberships for later processing
+# runningaheadmembers -- class pulls in individual memberships for later processing
 #
 #       Date            Author          Reason
 #       ----            ------          ------
@@ -25,6 +25,7 @@
 # standard
 import csv
 from datetime import datetime
+import difflib
 
 # home grown
 from loutilities import timeu
@@ -87,6 +88,11 @@ class RunningAheadMembers():
     def __init__(self,memberfile,overlapfile=None):
     #----------------------------------------------------------------------
 
+        # initialize class attributes
+        self.closematches = None
+        self.names = {}
+        self.dobnames = {}
+
         # check for type of memberfile, assume not opened here
         openedhere = False
 
@@ -112,7 +118,6 @@ class RunningAheadMembers():
         
         ## preprocess file to remove overlaps between join date and expiration date across records
         # each member's records are appended to a list of records in dict keyed by (lname,fname,dob)
-        self.names = {}
         for membership in INCSV:
             asc_joindate = membership['JoinDate']
             asc_expdate = membership['ExpirationDate']
@@ -124,6 +129,7 @@ class RunningAheadMembers():
 
             # get list of records associated with each member, pulling out significant fields
             thisrec = {'MemberID':memberid,'name':fullname,'join':asc_joindate,'expiration':asc_expdate,'dob':dob,'fullrec':membership,'RunningAheadMember':RunningAheadMember(membership)}
+            # careful - this tuple order is assumed in several places
             thisname = (lname,fname,dob)
             if not thisname in self.names:
                 self.names[thisname] = []
@@ -136,7 +142,15 @@ class RunningAheadMembers():
             OVRLP.writeheader()
 
         # sort list of records under each name, and remove overlaps between records
+        # create dobnames access. self.dobnames allows access to self.names key based on dob
         for thisname in self.names:
+            # self.dobnames allows access to self.names key based on dob
+            lname,fname,dob = thisname
+            if dob not in self.dobnames:
+                self.dobnames[dob] = []
+            if (lname,fname) not in self.dobnames[dob]:
+                self.dobnames[dob].append({'lname':lname,'fname':fname})
+
             # sort should result so records within a name are by join date within expiration year
             # see http://stackoverflow.com/questions/72899/how-do-i-sort-a-list-of-dictionaries-by-values-of-the-dictionary-in-python
             self.names[thisname] = sorted(self.names[thisname],key=lambda k: (k['expiration'],k['join']))
@@ -164,6 +178,7 @@ class RunningAheadMembers():
                     # update this record's join dates
                     self.names[thisname][i]['join'] = jan1_asc
                     self.names[thisname][i]['fullrec']['JoinDate'] = jan1_asc
+                    self.names[thisname][i]['RunningAheadMember'].join = jan1_asc
             
             # throw out anomalous records. reverse toss first so the pops don't change the indexes.
             toss.reverse()
@@ -179,24 +194,119 @@ class RunningAheadMembers():
             memberfileh.close()
 
     #----------------------------------------------------------------------
-    def membership_iter(self):
+    def membership_iter(self,raw = False):
     #----------------------------------------------------------------------
+    # TODO: is raw needed?
         '''
-        generator function that yields full record for each memberships
+        generator function that yields full record for each of memberships
+
+        :param raw: True to yield dict, False to yield RunningAheadMember object, default False
         '''
         for thisname in self.names:
             for thismembership in self.names[thisname]:
-                yield thismembership['RunningAheadMember']
+                if not raw:
+                    yield thismembership['RunningAheadMember']
+                else:
+                    yield thismembership['fullrec']
 
     #----------------------------------------------------------------------
-    def name_iter(self):
+    def member_iter(self,raw=False):
     #----------------------------------------------------------------------
+    # TODO: is raw needed?
         '''
-        generator function that yields latest membership record for each names with
+        generator function that yields latest membership record for each of names with
         JoinDate updated to earliest JoinDate
+
+        :param raw: True to yield dict, False to yield RunningAheadMember object, default False
         '''
         for thisname in self.names:
-            thismembership = self.names[thisname][-1]['RunningAheadMember']
-            thismembership.join = self.names[thisname][0]['join']
-            yield thismembership
+            if not raw:
+                thismembership = self.names[thisname][-1]['RunningAheadMember']
+                thismembership.join = self.names[thisname][0]['join']
+                yield thismembership
+            else:
+                thismembership = self.names[thisname][-1]['fullrec']
+                thismembership['JoinDate'] = self.names[thisname][0]['join']
+                yield thismembership
 
+    #----------------------------------------------------------------------
+    def getmember(self, memberkey):
+    #----------------------------------------------------------------------
+        '''
+        retrieve latest membership record for memberkey with 
+        JoinDate updated to earliest JoinDate
+
+        :param memberkey: (lname,fname,dob)
+        :rtype: RunningAheadMember object
+        '''
+
+        thismembership = self.names[memberkey][-1]['RunningAheadMember']
+        thismembership.join = self.names[memberkey][0]['join']
+        return thismembership
+
+    #----------------------------------------------------------------------
+    def getmemberships(self, memberkey):
+    #----------------------------------------------------------------------
+        '''
+        retrieve list of membership records for memberkey
+
+        :param memberkey: (lname,fname,dob)
+        :rtype: [RunningAheadMember object, ...]
+        '''
+
+        thesememberships = []
+        for thismembership in self.names[memberkey]:
+            thesememberships.append(thismembership['RunningAheadMember'])
+        return thesememberships
+
+    #----------------------------------------------------------------------
+    def getmemberkey(self, lname, fname, dob, cutoff=0.6, n=10):
+    #----------------------------------------------------------------------
+        '''
+        retrieve member key based on name, dob
+
+        if name wasn't found, None is returned
+        if None is returned, check close matches using getclosematches()
+        
+        :param lname: last name
+        :param fname: first name
+        :param dob: date of birth yyyy-mm-dd
+        :param cutoff: float in range (0,1] ratio of closeness to match name
+        :param n: number of names checked for closeness (most similar)
+        :rtype: (lname,fname,dob) or None if not found
+        '''
+        # no matches missed yet
+        self.closematches = []
+
+        # check dob
+        if dob not in self.dobnames:
+            return None
+
+        # make list of members with this dob
+        nameskeys = [('{} {}'.format(n['fname'],n['lname']).lower(),n) for n in self.dobnames[dob]]
+        possiblenames = [nk[0] for nk in nameskeys]
+        possiblekeys  = [(nk[1]['lname'],nk[1]['fname'],dob) for nk in nameskeys]
+
+        # make list of close matches
+        searchname = '{} {}'.format(fname,lname).lower()
+        closematches = difflib.get_close_matches(searchname,possiblenames,n=10,cutoff=cutoff)
+        for match in closematches:
+            # this should be first time through loop, so self.closematches will be empty list
+            if match == searchname:
+                return possiblekeys[possiblenames.index(match)]
+            else:
+                self.closematches.append(possiblekeys[possiblenames.index(match)])
+
+        # didn't find exact match
+        return None
+
+
+    #----------------------------------------------------------------------
+    #----------------------------------------------------------------------
+        '''
+        can be called after findmembers() to return list of members found, but did not match exactly
+        
+        :rtype: [(lname,fname,dob), ...]
+        '''
+        
+        return self.closematches
