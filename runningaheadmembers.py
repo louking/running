@@ -302,6 +302,7 @@ class RunningAheadMembers():
 
 
     #----------------------------------------------------------------------
+    def getclosematchkeys(self):
     #----------------------------------------------------------------------
         '''
         can be called after findmembers() to return list of members found, but did not match exactly
