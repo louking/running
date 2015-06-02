@@ -142,7 +142,8 @@ class RunningAheadMembers():
             OVRLP.writeheader()
 
         # sort list of records under each name, and remove overlaps between records
-        # create dobnames access. self.dobnames allows access to self.names key based on dob
+        # create dobnames access from self.names
+        # self.dobnames allows access to self.names -- self.dobnames[dob] can be used to find key for self.names[lname,fname,dob]
         for thisname in self.names:
             # self.dobnames allows access to self.names key based on dob
             lname,fname,dob = thisname
