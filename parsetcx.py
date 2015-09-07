@@ -72,181 +72,186 @@ def pace (
     
     return timestr(tsm)
 
+#----------------------------------------------------------------------
+def main(): 
+#----------------------------------------------------------------------
+    usage = "usage: %prog [options] <tcxfile> <laplist>\n\n"
+    usage += "where:\n"
+    usage += "  <tcxfile>\tfile output from Garmin Training Center\n"
+    usage += "  <laplist> is one of two formats:\n"
+    usage += "     no switches\tsets of laps to be averaged, i.e., 5,3 means average first 5 laps, next 3 laps, then remaining\n"
+    usage += "     -interval\tnum laps before first workout then num repeats\n"
+
+    parser = optparse.OptionParser(usage=usage)
+    parser.add_option("-i", "--interval", dest="interval", action="store_true", help="treat input as intervals: num laps before first workout then num repeats")
+    parser.set_defaults(interval=False)
+    (options, args) = parser.parse_args()
+
+    tcxfile = args.pop(0)
+    laplist = args.pop(0)
+    sets = [int(si) for si in laplist.split(',')]
+    numsets = len(sets)
+
+    root = xmldict.readXmlFile(tcxfile)
+    laps = root['TrainingCenterDatabase']['Activities']['Activity']['Lap']
+
+    numlaps = len(laps)
+
+    # set up uselap (ul) array
+    ul = [True for i in range(numlaps)]
+
+    # if interval (--interval) switch is set, reset to use a single set, and update uselap (ul) array
+    # to force accumulation of only the indicated repeats
+    if (options.interval):
+        ul = [False for i in range(numlaps)]
+        (numbefore,numint) = sets
+        for i in range(numint):
+            ul[numbefore+i*2] = True
+
+        sets = [numlaps,]
+        numsets = 0
+
+
+    more = True
+    lp = 0
+    tttime = 0
+    tthrtime = 0
+    tthr = 0
+    ttdist = 0
+
+    setstr = ""
+    csvstr = "distance,time,pace,avghr\n"
+    pacesstr = {}
+    pacesoneline = ''
+    pacesexcel = '=('
+    hrsexcel = '=('
+    firstul = True
+
+    for s in range(numsets+1):  # and more
+        ttime = 0
+        thrtime = 0
+        thr = 0
+        tdist = 0
+        if s < numsets:
+            setlimit = sets[s]
+        else:
+            setlimit = numlaps # numlaps for convenient ceiling for limit
+        for i in range(setlimit):   # and more; i++) {
+            time = float(laps[lp]['TotalTimeSeconds'])
+            dist = float(laps[lp]['DistanceMeters'])        # bug in xmldict?  Seems to put into a list if any child tag has the same name
+    		# hr is optional
+            hr = int(laps[lp]['AverageHeartRateBpm']['Value']) if laps[lp].has_key('AverageHeartRateBpm') else 0
+            
+            if dist <> 0.0:
+            
+                # accumulate for this set
+                # for interval switch, only indicated laps are averaged
+                if (ul[lp]):
+                    ttime += time
+                    if (lp!=0):
+                        thrtime += time 
+                        thr += hr * time
+                    
+                    tdist += dist
+                    if not firstul:
+                        pacesoneline += ', '
+                        pacesexcel += '+'
+                        hrsexcel += '+'
+                    firstul = False
+                
+                
+                # accumulate for whole run
+                tttime += time
+                if (lp!=0):
+                    tthrtime += time
+                    tthr += hr * time
+                
+                ttdist += dist
+                
+                pacesstr[lp] = pacesstr.setdefault(lp,"") + timestr(time) + "({0:d})".format(hr)
+                csvstr += "{0:.2f},{1},{2},{3}\n".format(dist/METERPMILE,timestr(time),pace(time,dist),hr)
+                if (ul[lp]):
+                    pacesoneline += timestr(time) + "({0:d})".format(hr)
+                    pacesexcel += '"{0}"'.format(timestr(time,True))
+                    hrsexcel += '{0:d}'.format(hr)
+
+                # indicate distance=pace for odd-distanced splits
+                if (dist != METERPMILE):
+                    pacesstr[lp] += " [{0:.2f}={1}]".format(dist/METERPMILE,pace(time,dist))
+
+            # weird 0 distance lap
+            else:
+                pacesstr[lp] = pacesstr.setdefault(lp,"") + timestr(time) + "({0:d})".format(hr)
+                
+            lp += 1
+            if (lp == numlaps):
+                more = False
+                break
+        
+        # calculate averages over this set
+        if thrtime > 0:
+            ahr = int ((thr / thrtime) + 0.5)
+        else:
+            ahr = "n/a"
+        apace = pace (ttime, tdist)
+        adist = tdist / METERPMILE
+        if s < numsets:
+            intmiles = int(adist+0.5)
+            if math.fabs(tdist/intmiles-METERPMILE) < EPSILON:
+                adistpr = int(adist+EPSILON/METERPMILE)
+            else:
+                adistpr = adist 
+        else: 
+            adistpr = "{0:.2f}".format(adist)
+        
+        if (s > 0):
+            setstr += ", "
+        setstr += "{0}@{1}({2})".format(adistpr,apace,ahr)
+
+        if not more:
+            break
+        
+
+    # calculate averages over the whole run
+    athr = int ((tthr / tthrtime) + 0.5)
+    atpace = pace (tttime, ttdist)
+    atdist = ttdist / METERPMILE
+    totstr = "{0:.1f} miles, {1}, {2}/mi, AHR {3} ({4}% MHR)".format (atdist, timestr(tttime), atpace, athr, int((athr*100/MHR)+0.5))
+
+    CSV = open ("history.csv","w")
+    CSV.write (csvstr)
+    CSV.close()
+
+    OUT = open ("temp.txt","w")
+    OUT.write ("{0}\n".format(totstr))
+    OUT.write ("{0}\n\n".format(setstr))
+    if (options.interval):
+        countlaps = 0
+        OUT.write ("splits:\n")
+        for lp in range(numlaps):
+            if (ul[lp]):
+                OUT.write ("{0}\n".format(pacesstr[lp]))
+                countlaps += 1
+        OUT.write ("\n")
+    else:
+        countlaps = numlaps
+        
+
+    OUT.write ("all splits:\n")
+    for lp in range(numlaps):
+        split = lp+1
+        OUT.write ("{0} - {1}\n".format(split,pacesstr[lp]))
+
+    OUT.write('\n')
+    OUT.write(pacesoneline+'\n')
+    OUT.write(pacesexcel+')\n')
+    OUT.write(hrsexcel+')/'+str(countlaps)+'\n')
+
+    OUT.close()
+    os.startfile ("temp.txt")
+
 # ##########################################################################################
 #   __main__
 # ##########################################################################################
-
-usage = "usage: %prog [options] <tcxfile> <laplist>\n\n"
-usage += "where:\n"
-usage += "  <tcxfile>\tfile output from Garmin Training Center\n"
-usage += "  <laplist> is one of two formats:\n"
-usage += "     no switches\tsets of laps to be averaged, i.e., 5,3 means average first 5 laps, next 3 laps, then remaining\n"
-usage += "     -interval\tnum laps before first workout then num repeats\n"
-
-parser = optparse.OptionParser(usage=usage)
-parser.add_option("-i", "--interval", dest="interval", action="store_true", help="treat input as intervals: num laps before first workout then num repeats")
-parser.set_defaults(interval=False)
-(options, args) = parser.parse_args()
-
-tcxfile = args.pop(0)
-laplist = args.pop(0)
-sets = [int(si) for si in laplist.split(',')]
-numsets = len(sets)
-
-root = xmldict.readXmlFile(tcxfile)
-laps = root['TrainingCenterDatabase']['Activities']['Activity']['Lap']
-
-numlaps = len(laps)
-
-# set up uselap (ul) array
-ul = [True for i in range(numlaps)]
-
-# if interval (--interval) switch is set, reset to use a single set, and update uselap (ul) array
-# to force accumulation of only the indicated repeats
-if (options.interval):
-    ul = [False for i in range(numlaps)]
-    (numbefore,numint) = sets
-    for i in range(numint):
-        ul[numbefore+i*2] = True
-
-    sets = [numlaps,]
-    numsets = 0
-
-
-more = True
-lp = 0
-tttime = 0
-tthrtime = 0
-tthr = 0
-ttdist = 0
-
-setstr = ""
-csvstr = "distance,time,pace,avghr\n"
-pacesstr = {}
-pacesoneline = ''
-pacesexcel = '=('
-hrsexcel = '=('
-firstul = True
-
-for s in range(numsets+1):  # and more
-    ttime = 0
-    thrtime = 0
-    thr = 0
-    tdist = 0
-    if s < numsets:
-        setlimit = sets[s]
-    else:
-        setlimit = numlaps # numlaps for convenient ceiling for limit
-    for i in range(setlimit):   # and more; i++) {
-        time = float(laps[lp]['TotalTimeSeconds'])
-        dist = float(laps[lp]['DistanceMeters'])        # bug in xmldict?  Seems to put into a list if any child tag has the same name
-		# hr is optional
-        hr = int(laps[lp]['AverageHeartRateBpm']['Value']) if laps[lp].has_key('AverageHeartRateBpm') else 0
-        
-        if dist <> 0.0:
-        
-            # accumulate for this set
-            # for interval switch, only indicated laps are averaged
-            if (ul[lp]):
-                ttime += time
-                if (lp!=0):
-                    thrtime += time 
-                    thr += hr * time
-                
-                tdist += dist
-                if not firstul:
-                    pacesoneline += ', '
-                    pacesexcel += '+'
-                    hrsexcel += '+'
-                firstul = False
-            
-            
-            # accumulate for whole run
-            tttime += time
-            if (lp!=0):
-                tthrtime += time
-                tthr += hr * time
-            
-            ttdist += dist
-            
-            pacesstr[lp] = pacesstr.setdefault(lp,"") + timestr(time) + "({0:d})".format(hr)
-            csvstr += "{0:.2f},{1},{2},{3}\n".format(dist/METERPMILE,timestr(time),pace(time,dist),hr)
-            if (ul[lp]):
-                pacesoneline += timestr(time) + "({0:d})".format(hr)
-                pacesexcel += '"{0}"'.format(timestr(time,True))
-                hrsexcel += '{0:d}'.format(hr)
-
-            # indicate distance=pace for odd-distanced splits
-            if (dist != METERPMILE):
-                pacesstr[lp] += " [{0:.2f}={1}]".format(dist/METERPMILE,pace(time,dist))
-
-        # weird 0 distance lap
-        else:
-            pacesstr[lp] = pacesstr.setdefault(lp,"") + timestr(time) + "({0:d})".format(hr)
-            
-        lp += 1
-        if (lp == numlaps):
-            more = False
-            break
-    
-    # calculate averages over this set
-    if thrtime > 0:
-        ahr = int ((thr / thrtime) + 0.5)
-    else:
-        ahr = "n/a"
-    apace = pace (ttime, tdist)
-    adist = tdist / METERPMILE
-    if s < numsets:
-        intmiles = int(adist+0.5)
-        if math.fabs(tdist/intmiles-METERPMILE) < EPSILON:
-            adistpr = int(adist+EPSILON/METERPMILE)
-        else:
-            adistpr = adist 
-    else: 
-        adistpr = "{0:.2f}".format(adist)
-    
-    if (s > 0):
-        setstr += ", "
-    setstr += "{0}@{1}({2})".format(adistpr,apace,ahr)
-
-    if not more:
-        break
-    
-
-# calculate averages over the whole run
-athr = int ((tthr / tthrtime) + 0.5)
-atpace = pace (tttime, ttdist)
-atdist = ttdist / METERPMILE
-totstr = "{0:.1f} miles, {1}, {2}/mi, AHR {3} ({4}% MHR)".format (atdist, timestr(tttime), atpace, athr, int((athr*100/MHR)+0.5))
-
-CSV = open ("history.csv","w")
-CSV.write (csvstr)
-CSV.close()
-
-OUT = open ("temp.txt","w")
-OUT.write ("{0}\n".format(totstr))
-OUT.write ("{0}\n\n".format(setstr))
-if (options.interval):
-    countlaps = 0
-    OUT.write ("splits:\n")
-    for lp in range(numlaps):
-        if (ul[lp]):
-            OUT.write ("{0}\n".format(pacesstr[lp]))
-            countlaps += 1
-    OUT.write ("\n")
-else:
-    countlaps = numlaps
-    
-
-OUT.write ("all splits:\n")
-for lp in range(numlaps):
-    split = lp+1
-    OUT.write ("{0} - {1}\n".format(split,pacesstr[lp]))
-
-OUT.write('\n')
-OUT.write(pacesoneline+'\n')
-OUT.write(pacesexcel+')\n')
-OUT.write(hrsexcel+')/'+str(countlaps)+'\n')
-
-OUT.close()
-os.startfile ("temp.txt")
+if __name__ == "__main__":
+    main()
