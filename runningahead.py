@@ -30,7 +30,6 @@ runningahead - access methods for runningahead.com
 import pdb
 import argparse
 import os.path
-import urllib
 import json
 import logging
 
