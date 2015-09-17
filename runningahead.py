@@ -30,7 +30,6 @@ runningahead - access methods for runningahead.com
 import pdb
 import argparse
 import os.path
-import json
 import logging
 
 # pypi
@@ -43,7 +42,7 @@ from oauthlib.oauth2 import BackendApplicationClient
 # other
 
 # home grown
-from running import *
+# from running import *
 from loutilities import apikey
 
 # OAuth stuff
