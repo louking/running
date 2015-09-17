@@ -32,9 +32,12 @@ import argparse
 import os.path
 import urllib
 import json
+import logging
 
 # pypi
-import httplib2
+import requests
+from requests_oauthlib import OAuth2Session
+from oauthlib.oauth2 import BackendApplicationClient
 
 # github
 
@@ -57,8 +60,14 @@ FIELD['workout'] = {
     'duration':21,  # seconds
     'coursename':22,
     }
-HTTPTIMEOUT = 5
 KMPERMILE = 1.609344
+
+# set up debug logging
+logging.basicConfig() # you need to initialize logging, otherwise you will not see anything from requests
+logging.getLogger().setLevel(logging.DEBUG)
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
 
 #----------------------------------------------------------------------
 def dist2miles(distance):
@@ -134,18 +143,15 @@ class RunningAhead():
             key = ak.getkey('ra')
             secret = ak.getkey('rasecret')
         except apikey.unknownKey:
-            raise parameterError, "'ra'  and 'rasecret' keys needs to be configured using apikey"
+            raise parameterError, "'ra' and 'rasecret' keys needs to be configured using apikey"
         
         # Step 3 from http://api.runningahead.com/docs/authentication (using client_credentials, not authorization_code)
-        self.http = httplib2.Http(timeout=HTTPTIMEOUT)
-        resp,jsoncontent = self._httpreq('https://api.runningahead.com/oauth2/token',
-                                         method='POST',
-                                         client_id=key,
-                                         client_secret=secret,
-                                         grant_type='client_credentials'
-                                         )
-        content = json.loads(jsoncontent)
-        self.client_credentials = content['access_token']
+        # see http://requests-oauthlib.readthedocs.org/en/latest/oauth2_workflow.html#legacy-application-flow
+        client = BackendApplicationClient(client_id=key)
+        oauth = OAuth2Session(client=client)
+        data = oauth.fetch_token(token_url='https://api.runningahead.com/oauth2/token', client_id=key, client_secret=secret)
+        self.client_credentials = data['access_token']
+
         
     #----------------------------------------------------------------------
     def listusers(self):
@@ -288,112 +294,66 @@ class RunningAhead():
         return user
         
     #----------------------------------------------------------------------
-    def listmembers(self,club,**filters):
+    def listmembers(self,club,accesstoken,**filters):
     #----------------------------------------------------------------------
         """
         return list of club members
         
+        :param club: RA slug name of club
         :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
+        :param accesstoken: access token for a priviledged viewer for this club
         :rtype: list of members
         """
         
-        
-        # max number of workouts in workout list is 100, so need to loop, collecting
-        # BITESIZE workouts at a time.  These are all added to workouts list, and final
-        # list is returned to the caller
-        members = []
-        while True:
-            data = self._raget('clubs/{}/members'.format(club),
-                               self.client_credentials,
-                               **filters
-                               )
-            if data['numEntries'] == 0:
-                break
-            
-            thesemembers = data['entries']
-            members += thesemembers
-            offset += BITESIZE
-
-            # stop iterating if we've reached the end of the data
-            if offset >= data['numEntries']:
-                break
-        
-        # here would be a fine place to operate on an optional filter parameter.
-        # only problem with that is every time I do that I make the filter parameter
-        # so complex that I can never figure it out myself
+        # retrieve all the members
+        method = 'clubs/{}/members'.format(club)
+        data = self._raget(method,accesstoken)
+        members = data['entries']
         
         return members  
         
     #----------------------------------------------------------------------
-    def _raget(self,method,accesstoken,**params):
+    def getmember(self,club,id,accesstoken,**filters):
+    #----------------------------------------------------------------------
+        """
+        return list of club members
+        
+        :param club: RA slug name of club
+        :param id: id of member
+        :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
+        :param accesstoken: access token for a priviledged viewer
+        :rtype: member record
+        """
+        
+        method = 'clubs/{}/members/{}'.format(club,id)
+        data = self._raget(method,accesstoken)
+        member = data['member']
+        
+        return member
+        
+    #----------------------------------------------------------------------
+    def _raget(self,method,accesstoken,**payload):
     #----------------------------------------------------------------------
         """
         get method for runningahead access
         
         :param method: runningahead method to call
         :param accesstoken: access_token to use for api call
-        :param **params: parameters for the method
+        :param **payload: parameters for the method
         """
         
-        self._authorize(params,accesstoken)
+        payload['access_token'] = accesstoken
         
-        body = urllib.urlencode(params)
-        url = 'https://api.runningahead.com/rest/{0}?{1}'.format(method,body)
-        resp,jsoncontent = self.http.request(url)
-        
-        if resp.status != 200:
-            raise accessError, 'URL response status={}, url={}'.format(resp.status,url)
-        
-        # unmarshall the response content
-        content = json.loads(jsoncontent)
-        
+        url = 'https://api.runningahead.com/rest/{0}'.format(method)
+        r = requests.get(url,params=payload)
+        content = r.json()
+
         if content['code'] != 0:
             raise accessError, 'RA response code={}, url={}'.format(content['code'],url)
     
         data = content['data']
         return data 
         
-    #----------------------------------------------------------------------
-    def _httpreq(self,url,**params):
-    #----------------------------------------------------------------------
-        """
-        http request
-        
-        :param method: 'GET' or 'POST'
-        :param **params: parameters for the method
-        """
-        
-        method = params.pop('method','GET')
-        
-        if method == 'GET':
-            urlparams = urllib.urlencode(params)
-            url = '{0}?{1}'.format(url,urlparams)
-            body = None
-        elif method == 'POST':
-            url = '{0}'.format(url)
-            body = urllib.urlencode(params)
-        else:
-            raise invalidParameter, '{0} not supported'.format(method)
-        
-        resp,content = self.http.request(url,method,body)
-        
-        if resp.status != 200:
-            raise accessError, 'URL response status = {0}'.format(resp.status)
-        
-        return resp,content
-        
-    #----------------------------------------------------------------------
-    def _authorize(self,params,accesstoken):
-    #----------------------------------------------------------------------
-        """
-        add authorization to params
-        
-        :param params: list of parameters for API method
-        :param accesstoken: access_token to use
-        """
-
-        params['access_token'] = accesstoken
-
 #----------------------------------------------------------------------
 def main(): 
 #----------------------------------------------------------------------
