@@ -60,13 +60,6 @@ FIELD['workout'] = {
     }
 KMPERMILE = 1.609344
 
-# set up debug logging
-logging.basicConfig() # you need to initialize logging, otherwise you will not see anything from requests
-logging.getLogger().setLevel(logging.DEBUG)
-requests_log = logging.getLogger("requests.packages.urllib3")
-requests_log.setLevel(logging.DEBUG)
-requests_log.propagate = True
-
 #----------------------------------------------------------------------
 def dist2miles(distance):
 #----------------------------------------------------------------------
@@ -126,14 +119,27 @@ class RunningAhead():
 ########################################################################
     '''
     access methods for RunningAhead.com
+
+    :param debug: set to True for debug logging of http requests, default False
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self):
+    def __init__(self, debug=False):
     #----------------------------------------------------------------------
         """
         initialize oauth authentication
         """
+
+        # does user want to debug?
+        if debug:
+            # set up debug logging
+            logging.basicConfig() # you need to initialize logging, otherwise you will not see anything from requests
+            logging.getLogger().setLevel(logging.DEBUG)
+            requests_log = logging.getLogger("requests.packages.urllib3")
+            requests_log.setLevel(logging.DEBUG)
+            requests_log.propagate = True
+        else:
+            pass # how to stop?
 
         # get credentials from configuration
         ak = apikey.ApiKey('Lou King','running')
@@ -149,6 +155,9 @@ class RunningAhead():
         oauth = OAuth2Session(client=client)
         data = oauth.fetch_token(token_url='https://api.runningahead.com/oauth2/token', client_id=key, client_secret=secret)
         self.client_credentials = data['access_token']
+
+        # set up session for multiple requests
+        self.rasession = requests.Session()
 
         
     #----------------------------------------------------------------------
@@ -292,33 +301,32 @@ class RunningAhead():
         return user
         
     #----------------------------------------------------------------------
-    def listmembers(self,club,accesstoken,**filters):
+    def listmemberships(self,club,accesstoken,**filters):
     #----------------------------------------------------------------------
         """
-        return list of club members
+        return list of club memberships
         
         :param club: RA slug name of club
-        :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
         :param accesstoken: access token for a priviledged viewer for this club
-        :rtype: list of members
+        :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
+        :rtype: list of memberships
         """
         
         # retrieve all the members
         method = 'clubs/{}/members'.format(club)
-        data = self._raget(method,accesstoken)
-        members = data['entries']
+        data = self._raget(method,accesstoken,**filters)
+        memberships = data['entries']
         
-        return members  
+        return memberships
         
     #----------------------------------------------------------------------
-    def getmember(self,club,id,accesstoken,**filters):
+    def getmember(self,club,id,accesstoken):
     #----------------------------------------------------------------------
         """
         return list of club members
         
         :param club: RA slug name of club
         :param id: id of member
-        :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
         :param accesstoken: access token for a priviledged viewer
         :rtype: member record
         """
@@ -328,6 +336,24 @@ class RunningAhead():
         member = data['member']
         
         return member
+        
+    #----------------------------------------------------------------------
+    def listmembershiptypes(self,club,accesstoken):
+    #----------------------------------------------------------------------
+        """
+        return list of club membership types
+        
+        :param club: RA slug name of club
+        :param accesstoken: access token for a priviledged viewer for this club
+        :rtype: list of memberships
+        """
+        
+        # retrieve all the members
+        method = 'clubs/{}/memberships'.format(club)
+        data = self._raget(method,accesstoken)
+        membershiptypes = data['entries']
+        
+        return membershiptypes
         
     #----------------------------------------------------------------------
     def _raget(self,method,accesstoken,**payload):
@@ -343,7 +369,7 @@ class RunningAhead():
         payload['access_token'] = accesstoken
         
         url = 'https://api.runningahead.com/rest/{0}'.format(method)
-        r = requests.get(url,params=payload)
+        r = self.rasession.get(url,params=payload)
         content = r.json()
 
         if content['code'] != 0:
