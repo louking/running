@@ -30,6 +30,9 @@ import difflib
 # home grown
 from loutilities import timeu
 ymd = timeu.asctime('%Y-%m-%d')
+from loutilities.csvwt import wlist
+
+class unsupportedFileType(): pass
 
 ########################################################################
 class RunningAheadMember():
@@ -106,7 +109,7 @@ class RunningAheadMembers():
             memberfileh = memberfile
 
         # if list, it works like a handle
-        elif type(memberfile) == list:
+        elif type(memberfile) in [list,wlist]:
             memberfileh = memberfile
 
         # otherwise, not handled
