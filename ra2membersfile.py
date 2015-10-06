@@ -44,7 +44,7 @@ filehdr = ["MemberID","MembershipType","FamilyName","GivenName","MiddleName","Ge
 from loutilities import csvwt
 
 #----------------------------------------------------------------------
-def adddetails(details,memberrecord):
+def adddetails(details, memberrecord):
 #----------------------------------------------------------------------
     '''
     add details of membership to member record
@@ -81,7 +81,7 @@ def adddetails(details,memberrecord):
     # EntryType
 
 #----------------------------------------------------------------------
-def ra2members(club,accesstoken,filename=None,**filters):
+def ra2members(club, accesstoken, membercachefilename=None, update=False, filename=None, **filters):
 #----------------------------------------------------------------------
     '''
     retrieve RunningAHEAD members and create a file or list containing
@@ -89,12 +89,14 @@ def ra2members(club,accesstoken,filename=None,**filters):
 
     :param club: RunningAHEAD slug for club name
     :param accesstoken: access token for a priviledged viewer for this club
+    :param membercachefilename: name of optional file to cache detailed member data
+    :param update: update member cache based on latest information from RA
     :param filename: name of file for output. If None, list is returned and file is not created
     :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
     '''
 
     # initialize
-    ra = runningahead.RunningAhead()
+    ra = runningahead.RunningAhead(membercachefilename=membercachefilename)
     memberlist = csvwt.wlist()
     members = unicodecsv.DictWriter(memberlist,filehdr)
     members.writeheader()
@@ -115,16 +117,19 @@ def ra2members(club,accesstoken,filename=None,**filters):
         member['MembershipType'] = mshipxlate[membership['membershipId']]
         # need to get expiration from top record, else latest expiration is retrieved
         member['ExpirationDate'] = membership.get('expiration',None)
-        adddetails(ra.getmember(club, membership['id'], accesstoken), member)
+        adddetails(ra.getmember(club, membership['id'], accesstoken, update=update), member)
         members.writerow(member)
 
         # collect records for secondary members, if there are any
         member['PrimaryMember'] = None
         if 'members' in membership:
             for thismember in membership['members']:
-                adddetails(ra.getmember(club, thismember['id'], accesstoken), member)
+                adddetails(ra.getmember(club, thismember['id'], accesstoken, update=update), member)
                 members.writerow(member)
 
+    # clean up
+    ra.close()
+    
     # write the file if requested
     if filename:
         with open(filename,'wb') as outfile:
