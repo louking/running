@@ -31,6 +31,8 @@ import pdb
 import argparse
 import os.path
 import logging
+import json
+from tempfile import NamedTemporaryFile
 
 # pypi
 import requests
@@ -59,6 +61,8 @@ FIELD['workout'] = {
     'coursename':22,
     }
 KMPERMILE = 1.609344
+
+class accessError(Exception): pass
 
 #----------------------------------------------------------------------
 def dist2miles(distance):
@@ -120,14 +124,15 @@ class RunningAhead():
     '''
     access methods for RunningAhead.com
 
+    :param membercachefilename: name of optional file to cache detailed member data
     :param debug: set to True for debug logging of http requests, default False
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self, debug=False):
+    def __init__(self, membercachefilename=None, debug=False):
     #----------------------------------------------------------------------
         """
-        initialize oauth authentication
+        initialize oauth authentication, and load member cache
         """
 
         # does user want to debug?
@@ -159,7 +164,48 @@ class RunningAhead():
         # set up session for multiple requests
         self.rasession = requests.Session()
 
-        
+        # bring in cache file
+        self.membercache = {}
+        if membercachefilename:
+            self.membercachefilename = membercachefilename
+
+            # only read cache if file exists
+            if os.path.isfile(membercachefilename):
+                with open(membercachefilename,'r') as membercachefile:
+                    # members are stored one per line, in json format
+                    for line in membercachefile:
+                        member = json.loads(line)
+                        self.membercache[member['id']] = member
+        # optimization - no write on close if not updated
+        self.membercacheupdated = False
+
+    #----------------------------------------------------------------------
+    def close(self):
+    #----------------------------------------------------------------------
+        '''
+        close the connection when we're done, and save the cache
+        '''
+        # done here
+        self.rasession.close()
+
+        # save the cache in a temporary file, if updated
+        if self.membercacheupdated:
+            with NamedTemporaryFile(mode='w',suffix='.racache',delete=False) as tempcache:
+                tempmembercachefilename = tempcache.name
+                for id in self.membercache:
+                    tempcache.write('{}\n'.format(json.dumps(self.membercache[id])))
+
+            # now overwrite the previous version of the membercachefile with the new membercachefile
+            try:
+                # atomic operation in Linux
+                os.rename(tempmembercachefilename, self.membercachefilename)
+
+            # should only happen under windows
+            except OSError:
+                os.remove(self.membercachefilename)
+                os.rename(tempmembercachefilename, self.membercachefilename)
+
+
     #----------------------------------------------------------------------
     def listusers(self):
     #----------------------------------------------------------------------
@@ -320,7 +366,7 @@ class RunningAhead():
         return memberships
         
     #----------------------------------------------------------------------
-    def getmember(self,club,id,accesstoken):
+    def getmember(self,club,id,accesstoken,update=False):
     #----------------------------------------------------------------------
         """
         return list of club members
@@ -328,12 +374,21 @@ class RunningAhead():
         :param club: RA slug name of club
         :param id: id of member
         :param accesstoken: access token for a priviledged viewer
+        :param update: update based on latest information from RA
         :rtype: member record
         """
         
-        method = 'clubs/{}/members/{}'.format(club,id)
-        data = self._raget(method,accesstoken)
-        member = data['member']
+        # do we need to retrieve from RunningAHEAD?
+        if update or id not in self.membercache:
+            method = 'clubs/{}/members/{}'.format(club,id)
+            data = self._raget(method,accesstoken)
+            member = data['member']
+            self.membercache[id] = member
+            self.membercacheupdated = True
+
+        # use member data from cache
+        else:
+            member = self.membercache[id]
         
         return member
         
@@ -370,6 +425,9 @@ class RunningAhead():
         
         url = 'https://api.runningahead.com/rest/{0}'.format(method)
         r = self.rasession.get(url,params=payload)
+        if r.status_code != 200:
+            raise accessError, 'HTTP response code={}, url={}'.format(r.status_code,url)
+
         content = r.json()
 
         if content['code'] != 0:
