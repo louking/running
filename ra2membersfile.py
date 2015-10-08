@@ -81,7 +81,7 @@ def adddetails(details, memberrecord):
     # EntryType
 
 #----------------------------------------------------------------------
-def ra2members(club, accesstoken, membercachefilename=None, update=False, filename=None, **filters):
+def ra2members(club, accesstoken, membercachefilename=None, update=False, filename=None, debug=False, **filters):
 #----------------------------------------------------------------------
     '''
     retrieve RunningAHEAD members and create a file or list containing
@@ -92,11 +92,12 @@ def ra2members(club, accesstoken, membercachefilename=None, update=False, filena
     :param membercachefilename: name of optional file to cache detailed member data
     :param update: update member cache based on latest information from RA
     :param filename: name of file for output. If None, list is returned and file is not created
+    :param debug: True turns on requests debug
     :param filters: see http://api.runningahead.com/docs/club/list_members for valid filters
     '''
 
     # initialize
-    ra = runningahead.RunningAhead(membercachefilename=membercachefilename)
+    ra = runningahead.RunningAhead(membercachefilename=membercachefilename, debug=debug)
     memberlist = csvwt.wlist()
     members = unicodecsv.DictWriter(memberlist,filehdr)
     members.writeheader()
