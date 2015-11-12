@@ -164,11 +164,10 @@ class RunningAhead():
         # set up session for multiple requests
         self.rasession = requests.Session()
 
-        # bring in cache file
+        # bring in cache file, if requested
         self.membercache = {}
-        if membercachefilename:
-            self.membercachefilename = membercachefilename
-
+        self.membercachefilename = membercachefilename
+        if self.membercachefilename:
             # only read cache if file exists
             if os.path.isfile(membercachefilename):
                 with open(membercachefilename,'r') as membercachefile:
@@ -188,9 +187,11 @@ class RunningAhead():
         # done here
         self.rasession.close()
 
-        # save the cache in a temporary file, if updated
-        if self.membercacheupdated:
-            with NamedTemporaryFile(mode='w',suffix='.racache',delete=False) as tempcache:
+        # save the cache in a temporary file, if requested and it's been updated
+        if self.membercachefilename and self.membercacheupdated:
+            # get full path for self.membercachefilename to assure cachedir isn't relative
+            cachedir = os.path.dirname(os.path.abspath(self.membercachefilename))
+            with NamedTemporaryFile(mode='w', suffix='.racache', delete=False, dir=cachedir) as tempcache:
                 tempmembercachefilename = tempcache.name
                 for id in self.membercache:
                     tempcache.write('{}\n'.format(json.dumps(self.membercache[id])))
