@@ -32,6 +32,7 @@ import argparse
 import os.path
 import urllib
 import json
+import time
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s')
 
@@ -55,7 +56,8 @@ MEMBER_RESULTS_SEARCH = 'athletes/results/{id}'
 MEMBER_DETAILS = 'athletes/details/{handle}'
 ATH_CAT_RUNNING = 2
 
-HTTPTIMEOUT = 10
+HTTPTIMEOUT = 60
+SERVERDELAY = 20
 MPERMILE = 1609.344
 
 
@@ -243,28 +245,33 @@ class Athlinks():
         body = urllib.urlencode(params)
         url = '{}/{}?{}'.format(ATHLINKS_URL,method,body)
         
-        # loop RETRIES times for timeout
-        retries = 10
+        # loop RETRIES times for timeout or other error
+        retries = 20
         while retries > 0:
             retries -= 1
             try:
                 self.log.debug(url)
                 resp,jsoncontent = self.http.request(url)
+
+                if resp.status != 200:
+                    raise accessError, 'URL response status = {0}'.format(resp.status)
+                
+                # unmarshall the response content
+                content = json.loads(jsoncontent)
+
                 self.urlcount += 1
                 break
+
             except Exception, e:
                 if retries == 0:
                     self.log.info('{} requests attempted'.format(self.geturlcount()))
                     self.log.error('http request failure, retries exceeded: {0}'.format(e))
+                    if repr(e) == 'ValueError: No JSON object could be decoded':
+                        self.log.error('   jsoncontent={}'.format(jsoncontent))
                     raise
                 self.log.warning('http request failure: {0}'.format(e))
-        
-        if resp.status != 200:
-            raise accessError, 'URL response status = {0}'.format(resp.status)
-        
-        # unmarshall the response content
-        content = json.loads(jsoncontent)
-        
+                time.sleep(SERVERDELAY)  # give the server some time to recover
+
         return content 
         
 #----------------------------------------------------------------------
