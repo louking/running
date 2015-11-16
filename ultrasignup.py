@@ -185,8 +185,8 @@ class UltraSignupResult():
     # loop needs to be driven by us_event_attrs because it's shorter than output attrs
     # racename and distance fields are determined from parsing of 'eventname' from ultrasignup.com
     # gender comes from the outer list returned by ultrasignup
-    us_event_attrs = 'runner_rank,place,gender_place,age,time,eventdate,eventlocation'.split(',')    
-    attrs = 'ranking,oaplace,genplace,age,racetime,racedate,raceloc,racename,distmiles,distkm,gender'.split(',')
+    us_event_attrs = 'runner_rank,place,gender_place,age,time,eventdate,city,state'.split(',')    
+    attrs = 'ranking,oaplace,genplace,age,racetime,racedate,racecity,racestate,racename,distmiles,distkm,gender'.split(',')
     
     #----------------------------------------------------------------------
     def __init__(self,ranking=None,oaplace=None,genplace=None,age=None,gender=None,racetime=None,racedate=None,raceloc=None,racename=None,distmiles=None,distkm=None):

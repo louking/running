@@ -165,7 +165,7 @@ def collect(searchfile,outfile,begindate,enddate):
             racename = result.racename
             outrec['race'] = racename
             outrec['date'] = ftime.epoch2asc(e_racedate)
-            outrec['loc'] = result.raceloc
+            outrec['loc'] = '{}, {}'.format(result.racecity, result.racestate)
             
             # distance, category, time
             distmiles = result.distmiles
