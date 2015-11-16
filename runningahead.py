@@ -278,7 +278,8 @@ class RunningAhead():
         if enddate:   filters.append(['date','le',enddate])
         if getfields: optargs['fields']    = fields
         if filters:
-            optargs['filters'] = filters
+            # need to json encode the parameter, so requests doesn't unwravel it, as RA expects the json array of arrays
+            optargs['filters'] = json.dumps(filters)
         
         # max number of workouts in workout list is 100, so need to loop, collecting
         # BITESIZE workouts at a time.  These are all added to workouts list, and final
@@ -427,12 +428,12 @@ class RunningAhead():
         url = 'https://api.runningahead.com/rest/{0}'.format(method)
         r = self.rasession.get(url,params=payload)
         if r.status_code != 200:
-            raise accessError, 'HTTP response code={}, url={}'.format(r.status_code,url)
+            raise accessError, 'HTTP response code={}, url={}'.format(r.status_code,r.url)
 
         content = r.json()
 
         if content['code'] != 0:
-            raise accessError, 'RA response code={}, url={}'.format(content['code'],url)
+            raise accessError, 'RA response code={}, url={}'.format(content['code'],r.url)
     
         data = content['data']
         return data 
