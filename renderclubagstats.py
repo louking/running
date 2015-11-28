@@ -261,7 +261,7 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
     
     summfields = ['name','age','gender']
     distcategories = ['overall'] + [TRENDLIMITS[tlimit][0] for tlimit in TRENDLIMITS]
-    for stattype in ['agegrade','trend','numraces','stderr','r-squared','pvalue']:
+    for stattype in ['1yr agegrade','avg agegrade','trend','numraces','stderr','r-squared','pvalue']:
         for distcategory in distcategories:
             summfields.append('{}\n{}'.format(stattype,distcategory))
         if stattype == 'numraces':
@@ -362,7 +362,10 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
         summout['name'] = '=HYPERLINK("{}","{}")'.format(thisoutfile,rendername)
         summout['age'] = runnerage
         summout['gender'] = gender
-        summout['agegrade\noverall'] = avg['overall']
+        oneyrstats = [s.ag for s in allstats if s.date.year == lastyear]
+        if len(oneyrstats) > 0:
+            summout['1yr agegrade\noverall'] = mean(oneyrstats)
+        summout['avg agegrade\noverall'] = avg['overall']
         if len(allstats) >= mintrend:
             summout['trend\noverall'] = trend.slope
             summout['stderr\noverall'] = trend.stderr
@@ -378,7 +381,10 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
             avg[distcategory] = mean([s.ag for s in tstats])
             trend = aag[thisname].render_trendline(fig,distcategory,thesestats=tstats,color=distcolor)
             
-            summout['agegrade\n{}'.format(distcategory)] = avg[distcategory]
+            oneyrcategory = [s.ag for s in tstats if s.date.year == lastyear]
+            if len(oneyrcategory) > 0:
+                summout['1yr agegrade\n{}'.format(distcategory)] = mean(oneyrcategory)
+            summout['avg agegrade\n{}'.format(distcategory)] = avg[distcategory]
             summout['trend\n{}'.format(distcategory)] = trend.slope
             summout['stderr\n{}'.format(distcategory)] = trend.stderr
             summout['r-squared\n{}'.format(distcategory)] = trend.rvalue**2
