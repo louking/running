@@ -39,7 +39,7 @@ setup(
     name = "running",
     version = version.__version__,
     packages = find_packages(),
-#    include_package_data = True,
+
     scripts = [
         'running/analyzeagegrade.py',
         'running/athlinksresults.py',
@@ -48,6 +48,7 @@ setup(
         'running/parsetcx.py',
         'running/renderclubagstats.py',
         'running/runningaheadresults.py',
+        'running/strava.py',
         'running/ultrasignupresults.py',
     ],
 
@@ -78,6 +79,7 @@ setup(
             'renderclubagstats = running.renderclubagstats:main',
             'runningaheadresults = running.runningaheadresults:main',
             'ultrasignupresults = running.ultrasignupresults:main',
+            'updatestravaclubactivitycache = running.strava:updatestravaclubactivitycache'
         ],
     },
 
