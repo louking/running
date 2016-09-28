@@ -55,12 +55,12 @@ setup(
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
     install_requires = [
-        'matplotlib>=1.1.1',
+        # 'matplotlib>=1.1.1', # not available on godaddy
         #'loutilities>=0.5.0',
-        'xlrd>=0.8.0',
-        'pykml>=0.1.0',
+        'xlrd>=0.8.0',   
+        # 'pykml>=0.1.0',       # lxml not available on godaddy
         'gpxpy>=0.7.0',
-        'lxml>=2.3',
+        # 'lxml>=2.3',          # lxml not available on godaddy
         'httplib2>=0.7.7',
         ],
 
