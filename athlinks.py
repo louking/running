@@ -111,17 +111,19 @@ class Athlinks():
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self,debug=False):
+    def __init__(self, key=None, debug=False):
     #----------------------------------------------------------------------
         """
         initialize http and get athlinks key
         """
         # get credentials from configuration
-        ak = apikey.ApiKey('Lou King','running')
-        try:
-            self.key = ak.getkey('athlinks')
-        except apikey.unknownKey:
-            raise parameterError, "'athlinks' key needs to be configured using apikey"
+        self.key = key
+        if not self.key:
+            ak = apikey.ApiKey('Lou King','running')
+            try:
+                self.key = ak.getkey('athlinks')
+            except apikey.unknownKey:
+                raise parameterError, "'athlinks' key needs to be configured using apikey"
         
         # need http object
         self.http = httplib2.Http(timeout=HTTPTIMEOUT)
