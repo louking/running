@@ -50,6 +50,7 @@ import version
 from loutilities import apikey
 from loutilities import timeu
 from loutilities.csvwt import record2csv
+from loutilities.csvu import unicode2ascii
 
 stravatime = timeu.asctime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -95,20 +96,23 @@ class Strava():
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self, clubactivitycachefilename=None, debug=False):
+    def __init__(self, clubactivitycachefilename=None, debug=False, key=None):
     #----------------------------------------------------------------------
         """
         initialize 
         """
 
         # get credentials from configuration
-        ak = apikey.ApiKey('Lou King','running')
-        try:
-            # key = ak.getkey('stravakey')
-            # secret = ak.getkey('stravasecret')
-            user = ak.getkey('stravauser')
-        except apikey.unknownKey:
-            raise parameterError, "'stravauser' needs to be configured using apikey"
+        if not key:
+            ak = apikey.ApiKey('Lou King','running')
+            try:
+                # key = ak.getkey('stravakey')
+                # secret = ak.getkey('stravasecret')
+                user = ak.getkey('stravauser')
+            except apikey.unknownKey:
+                raise parameterError, "'stravauser' needs to be configured using apikey"
+        else:
+            user = key
         
         self.user = user
 
@@ -316,9 +320,13 @@ class Strava():
             mapping = OrderedDict([
                 ('workout_id',      'id'),
                 ('start_date',      'start_date_local'),
-                ('name',            lambda rec: '{} {}'.format(rec['athlete']['firstname'], rec['athlete']['lastname'])),
+                ('name',            lambda rec: '{} {}'.format(unicode2ascii(rec['athlete']['firstname']), unicode2ascii(rec['athlete']['lastname']))),
+                ('fname',           lambda rec: '{} {}'.format(unicode2ascii(rec['athlete']['firstname']))),
+                ('lname',           lambda rec: '{} {}'.format(unicode2ascii(rec['athlete']['lastname']))),
+                ('gender',          lambda rec: '{} {}'.format(unicode2ascii(rec['athlete']['sex']))),
                 ('type',            'type'),
                 ('workout_type',    lambda rec: workout_type[rec['workout_type']]),
+                ('activity_name',   lambda rec: unicode2ascii(rec['name'])),
                 ('distance(m)',     'distance'),
                 ('time(s)',         'elapsed_time'),
             ])

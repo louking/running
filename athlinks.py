@@ -48,7 +48,7 @@ from loutilities import apikey
 from running import accessError, parameterError
 
 # access stuff
-ATHLINKS_URL = 'http://api.athlinks.com'
+ATHLINKS_URL = 'https://api.athlinks.com'
 RESULTS_SEARCH = 'Results/search'
 RACE_SEARCH = 'races/{id}'
 COURSE_SEARCH = 'races/{raceid}/{courseid}'

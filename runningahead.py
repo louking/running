@@ -129,7 +129,7 @@ class RunningAhead():
     '''
 
     #----------------------------------------------------------------------
-    def __init__(self, membercachefilename=None, debug=False):
+    def __init__(self, membercachefilename=None, debug=False, key=None, secret=None):
     #----------------------------------------------------------------------
         """
         initialize oauth authentication, and load member cache
@@ -146,13 +146,14 @@ class RunningAhead():
         else:
             pass # how to stop?
 
-        # get credentials from configuration
-        ak = apikey.ApiKey('Lou King','running')
-        try:
-            key = ak.getkey('ra')
-            secret = ak.getkey('rasecret')
-        except apikey.unknownKey:
-            raise parameterError, "'ra' and 'rasecret' keys needs to be configured using apikey"
+        # get credentials from configuration if not provided
+        if not (key and secret):
+            ak = apikey.ApiKey('Lou King','running')
+            try:
+                key = ak.getkey('ra')
+                secret = ak.getkey('rasecret')
+            except apikey.unknownKey:
+                raise parameterError, "'ra' and 'rasecret' keys needs to be configured using apikey"
         
         # Step 3 from http://api.runningahead.com/docs/authentication (using client_credentials, not authorization_code)
         # see http://requests-oauthlib.readthedocs.org/en/latest/oauth2_workflow.html#legacy-application-flow

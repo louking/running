@@ -30,7 +30,6 @@ ultrasignup - access methods for ultrasignup.com
 import argparse
 import os.path
 import urllib
-from lxml import etree
 import unicodedata
 import logging
 import json
@@ -38,7 +37,7 @@ logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s')
 
 # pypi
 import httplib2
-from IPython.core.debugger import Tracer; debug_here = Tracer()
+# from IPython.core.debugger import Tracer; debug_here = Tracer()
 
 # github
 
@@ -47,7 +46,7 @@ from IPython.core.debugger import Tracer; debug_here = Tracer()
 # home grown
 from loutilities import timeu
 from loutilities import csvu
-from runningclub import render
+from loutilities import renderrun as render
 from running import accessError, parameterError
 
 # access stuff
@@ -64,7 +63,7 @@ toutdate = timeu.asctime('%Y-%m-%d')
 def racenameanddist(eventname):
 #----------------------------------------------------------------------
     '''
-    get race name and distance from etree element
+    get race name and distance 
     
     :param eventname: eventname from untrasignup.com
     :rtype: racename, distmiles, distkm
@@ -126,7 +125,7 @@ def racenameanddist(eventname):
 def racenameanddur(eventname):
 #----------------------------------------------------------------------
     '''
-    get race name and duration from etree element
+    get race name and duration 
     
     :param eventname: eventname from untrasignup.com
     :rtype: racename, duration
