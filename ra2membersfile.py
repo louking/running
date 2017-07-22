@@ -30,6 +30,7 @@ ra2membersfile - retrieve RunningAHEAD member file to be put into file similar t
 import unicodecsv
 import pdb
 import argparse
+import logging
 
 # pypi
 
@@ -43,8 +44,14 @@ filehdr = ["MemberID","MembershipType","FamilyName","GivenName","MiddleName","Ge
 ]
 from loutilities import csvwt
 
+# set up logging
+logging.basicConfig() # you need to initialize logging, otherwise you will not see anything from requests
+logger = logging.getLogger("ra2membersfile")
+logger.setLevel(logging.DEBUG)
+logger.propagate = True
+
 #----------------------------------------------------------------------
-def adddetails(details, memberrecord):
+def adddetails(details, memberrecord, debug=False):
 #----------------------------------------------------------------------
     '''
     add details of membership to member record
@@ -79,6 +86,16 @@ def adddetails(details, memberrecord):
     memberrecord['Country'] = details['address'].get('country',None)
 
     # EntryType
+
+    if debug:
+        last = memberrecord['FamilyName']
+        first = memberrecord['GivenName']
+        try:
+            logger.debug('processing {}, {}'.format(last, first))
+        except UnicodeEncodeError:
+            # just ignore this error
+            pass
+
 
 #----------------------------------------------------------------------
 def ra2members(club, accesstoken, membercachefilename=None, update=False, filename=None, debug=False, **filters):
@@ -118,14 +135,14 @@ def ra2members(club, accesstoken, membercachefilename=None, update=False, filena
         member['MembershipType'] = mshipxlate[membership['membershipId']]
         # need to get expiration from top record, else latest expiration is retrieved
         member['ExpirationDate'] = membership.get('expiration',None)
-        adddetails(ra.getmember(club, membership['id'], accesstoken, update=update), member)
+        adddetails(ra.getmember(club, membership['id'], accesstoken, update=update), member, debug)
         members.writerow(member)
 
         # collect records for secondary members, if there are any
         member['PrimaryMember'] = None
         if 'members' in membership:
             for thismember in membership['members']:
-                adddetails(ra.getmember(club, thismember['id'], accesstoken, update=update), member)
+                adddetails(ra.getmember(club, thismember['id'], accesstoken, update=update), member, debug)
                 members.writerow(member)
 
     # clean up
