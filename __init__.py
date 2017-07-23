@@ -31,7 +31,6 @@ import os
 import os.path
 
 # pypi
-import appdirs
 
 # github
 
@@ -43,6 +42,3 @@ import appdirs
 class parameterError(Exception): pass
 class accessError(Exception): pass
 
-# configuration location for running scripts
-CONFIGDIR = appdirs.user_data_dir('running','Lou King')
-if not os.path.exists(CONFIGDIR): os.makedirs(CONFIGDIR)
