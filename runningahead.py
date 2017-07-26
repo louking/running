@@ -126,6 +126,8 @@ class RunningAhead():
 
     :param membercachefilename: name of optional file to cache detailed member data
     :param debug: set to True for debug logging of http requests, default False
+    :param key: ra key for oauth, if omitted retrieved from apikey
+    :param secret: ra secret for oauth, if omitted retrieved from apikey
     '''
 
     #----------------------------------------------------------------------

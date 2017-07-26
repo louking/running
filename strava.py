@@ -363,13 +363,24 @@ def updatestravaclubactivitycache():
                                      version='{0} {1}'.format('running',version.__version__))
     parser.add_argument('cachefile', help="pathname of file in which cache is saved")
     parser.add_argument('clubname', help="full name of club as known to strava")
+    parser.add_argument('--configfile', help='optional configuration filename', default=None)
     args = parser.parse_args()
 
     # let user know what is going on
     print 'Updating Strava club activity cache for "{}"'.format(args.clubname)
 
+    # configuration file supplied -- pull credentials from the app section
+    if args.configfile:
+        from loutilities.configparser import getitems
+        appconfig = getitems(args.configfile, 'app')
+        stravakey = appconfig['STRAVAKEY']
+    
+    # no configuration file, the credentials should be retrieved with loutilities.apikey
+    else:
+        stravakey = None
+
     # instantiate the Strava object, which opens the cache
-    ss = Strava(args.cachefile)
+    ss = Strava(args.cachefile, key=stravakey)
 
     # get the club id
     clubs = ss.getathleteclubs()
