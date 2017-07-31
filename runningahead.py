@@ -194,10 +194,16 @@ class RunningAhead():
         if self.membercachefilename and self.membercacheupdated:
             # get full path for self.membercachefilename to assure cachedir isn't relative
             cachedir = os.path.dirname(os.path.abspath(self.membercachefilename))
+
+            # save temporary file with cache
             with NamedTemporaryFile(mode='w', suffix='.racache', delete=False, dir=cachedir) as tempcache:
                 tempmembercachefilename = tempcache.name
                 for id in self.membercache:
                     tempcache.write('{}\n'.format(json.dumps(self.membercache[id])))
+
+            # set mode of temp file to be same as current cache file (see https://stackoverflow.com/questions/5337070/how-can-i-get-a-files-permission-mask)
+            cachemode = os.stat(self.membercachefilename).st_mode & 0777
+            os.chmod(tempmembercachefilename, cachemode)
 
             # now overwrite the previous version of the membercachefile with the new membercachefile
             try:
