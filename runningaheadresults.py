@@ -65,7 +65,7 @@ import datetime
 import time
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s')
-log = logging.getLogger('running.ultrasignup')
+log = logging.getLogger('running.runningahead')
 log.setLevel(logging.DEBUG)
 
 # pypi
