@@ -44,6 +44,7 @@ from oauthlib.oauth2 import BackendApplicationClient
 from loutilities.configparser import getitems
 from loutilities import timeu
 from loutilities.transform import Transform
+from loutilities.csvwt import record2csv
 
 # login API (deprecated)
 login_url = 'https://runsignup.com/rest/login'
@@ -120,6 +121,17 @@ class RunSignUp():
             self.credentials_type = 'key'
         else:
             self.credentials_type = 'login'
+
+    #----------------------------------------------------------------------
+    def __enter__(self):
+    #----------------------------------------------------------------------
+        self.open()
+        return self
+
+    #----------------------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, traceback):
+    #----------------------------------------------------------------------
+        self.close()
 
     #----------------------------------------------------------------------
     def open(self):
@@ -311,3 +323,27 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
 
     # let caller know the current members
     return currmembers
+
+#----------------------------------------------------------------------
+def members2csv(club_id, key, secret, mapping, filepath=None):
+#----------------------------------------------------------------------
+    '''
+    Access club_id through RunSignUp API to retrieve members. Return
+    list of members as if csv file. Optionally save csv file.
+
+    :param club_id: club_id from RunSignUp
+    :param key: api key for RunSignUp
+    :param secret: api secret for RunSignUp
+    :param mapping: OrderedDict {'outfield1':'infield1', 'outfield2':outfunction(inrec), ...} or ['inoutfield1', 'inoutfield2', ...]
+    :param normfile: (optional) pathname to save csv file
+    :rtype: csv file records, as list
+    '''
+
+    # get the members from the RunSignUp API
+    with RunSignUp(key=key, secret=secret) as rsu:
+        members = rsu.members(club_id)
+
+    filerows = record2csv(members, mapping, filepath)
+
+    return filerows
+
