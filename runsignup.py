@@ -29,7 +29,10 @@ runsignup - access methods for runsignup.com
 import logging
 from threading import RLock
 from csv import DictReader, DictWriter
-from datetime import datetime
+from datetime import datetime, timedelta
+from os.path import dirname, abspath
+from os import stat, chmod, rename, remove
+from tempfile import NamedTemporaryFile
 
 # pypi
 import requests
@@ -42,7 +45,7 @@ from oauthlib.oauth2 import BackendApplicationClient
 
 # home grown
 from loutilities.configparser import getitems
-from loutilities import timeu
+from loutilities. timeu import asctime
 from loutilities.transform import Transform
 from loutilities.csvwt import record2csv
 
@@ -232,10 +235,9 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
         thislogger.setLevel(logging.DEBUG)
         thislogger.propagate = True
     else:
-        # turn off debug logging
-        thislogger.setLevel(logging.DEBUG)
-        thislogger.setLevel(logging.NOTSET)
-        thislogger.propagate = False
+        # error logging
+        thislogger.setLevel(logging.ERROR)
+        thislogger.propagate = True
 
     # set up access to RunSignUp
     rsu = RunSignUp(key=key, secret=secret, email=email, password=password, debug=debug)
@@ -261,12 +263,61 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
                        targetattr=False
                      )
 
-    # memberrecs is kept only as a hash structure to check if member already in cache
-    memberrecs = {}
+    # members maintains the current cache through this processing {memberkey: [memberrec, ...]}
+    # currmemberrecs maintains the records for current members as of today {memberkey: memberrec}
+    members = {}
+    currmemberrecs = {}
 
-    # cacheupdatetime tracks last time cache file was updated on previous update
-    cacheupdatetime = datetime(1970,1,1)
-    dt = timeu.asctime('%Y-%m-%d %H:%M:%S')
+    # need today's date, in same sortable date format as data coming from RunSignUp
+    dt = asctime('%Y-%m-%d')
+    today = dt.dt2asc(datetime.now())
+
+    # construct key from member cache record
+    def getmemberkey(memberrec):
+        lastname = memberrec['FamilyName']
+        firstname = memberrec['GivenName']
+        dob = memberrec['DOB']
+        memberkey = '{},{},{}'.format(lastname, firstname, dob)
+        return memberkey
+
+    # add record to cache, return key
+    def add2cache(memberrec):
+        memberkey = getmemberkey(memberrec)
+        members.setdefault(memberkey,[])
+
+        # replace any records having same expiration date
+        recordlist = [mr for mr in members[memberkey] if mr['ExpirationDate'] != memberrec['ExpirationDate']] + [memberrec]
+        members[memberkey] = recordlist
+
+        # keep list sorted
+        sortby = 'ExpirationDate'
+        members[memberkey].sort(lambda a,b: cmp(a[sortby],b[sortby]))
+
+        # remove any overlaps
+        for i in range(1, len(members[memberkey])):
+            lastrec = members[memberkey][i-1]
+            thisrec = members[memberkey][i]
+            # if there's an overlap, change join date to expiration date + 1 day
+            if thisrec['JoinDate'] <= lastrec['ExpirationDate']:
+                exp = thisrec['ExpirationDate']
+                oldstart = thisrec['JoinDate']
+                newstart = dt.dt2asc( dt.asc2dt(lastrec['ExpirationDate']) + timedelta(1) )
+                thislogger.error('overlap detected: {} end={} was start={} now start={}'.format(memberkey, exp, oldstart, newstart))
+                thisrec['JoinDate'] = newstart
+
+        return memberkey
+
+    # test if in cache
+    def incache(memberrec):
+        memberkey = getmemberkey(memberrec)
+        if memberkey not in members:
+            cachedmember = False
+        elif memberrec['ExpirationDate'] in [m['ExpirationDate'] for m in members[memberkey]]:
+            cachedmember = True
+        else:
+            cachedmember = False
+
+        return cachedmember
 
     # lock cache update during execution
     rlock = RLock()
@@ -275,44 +326,81 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
         starttime = datetime.now()
 
         # import current cache
+        # records in cache are organized in members dict with 'last,first,dob' key
+        # within is list of memberships ordered by expiration date
         with open(membercachefilename, 'rb') as memfile:
-            # pull header off, then back to beginning
-            # filehdr used for DictWriter object later
-            filehdr = [f.strip() for f in memfile.readline().split(',')]
-            memfile.seek(0)
-
-            # memberrecs is kept only as a hash structure to check later if memberrec already in cache
+            # members maintains the current cache through this processing
+            # currmemberrecs maintains the records for current members as of today
             cachedmembers = DictReader(memfile)
             for memberrec in cachedmembers:
-                lastmodified = dt.asc2dt(memberrec['LastModified'])
-                if lastmodified > cacheupdatetime:
-                    cacheupdatetime = lastmodified
-                membershipid = memberrec['MembershipID']
-                memberid = memberrec['MemberID']
-                memberrecs['{}-{}'.format(membershipid, memberid)] = memberrec
+                memberkey = add2cache(memberrec)
 
-        # get current members
-        currmembers = rsu.members(club_id)
+                # current member?
+                if memberrec['JoinDate'] <= today and memberrec['ExpirationDate'] >= today:
+                    # member should only be in current members once
+                    if memberkey in currmemberrecs:
+                        thislogger.error( 'member duplicated in cache: {}'.format(memberkey) )
+                    
+                    # regardless add this record to current members
+                    currmemberrecs[memberkey] = memberrec
 
-        # append new members to cache file
-        with open(membercachefilename, 'ab') as memfile:
-            cachedmembers = DictWriter(memfile, filehdr)
-            for member in currmembers:
-                lastmodified = dt.asc2dt(member['last_modified'])
-                # only need to check records newer than what was latest in cache file
-                if lastmodified >= cacheupdatetime:
-                    # don't modify cacheupdatetime. that could lose new records if
-                    # the list is out of order
-                    membershipid = member['membership_id']
-                    memberid = member['user']['user_id']
-                    memberkey = '{}-{}'.format(membershipid, memberid)
+        # get current members from RunSignUp, transforming each to cache format
+        rsumembers = rsu.members(club_id)
+        rsucurrmembers = []
+        for rsumember in rsumembers:
+            memberrec = {}
+            xform.transform(rsumember, memberrec)
+            rsucurrmembers.append(memberrec)
 
-                    # if not cached already, transform to proper format and add to cache
-                    if memberkey not in memberrecs:
-                        memberrec = {}
-                        xform.transform(member, memberrec)
-                        memberrecs[memberkey] = memberrec
-                        cachedmembers.writerow(memberrec)
+        # add new member records to cache
+        # remove known (not new) member records from currmemberrecs
+        # after loop currmemberrecs should contain only deleted member records
+        for memberrec in rsucurrmembers:
+            # remember if was incache before we add
+            currmember = incache(memberrec)
+
+            # this will replace record with same ExpirationDate
+            # this allows admin updated RunSignUp data to be captured in cache
+            memberkey = add2cache(memberrec)
+
+            # remove member records we knew about already
+            if currmember:
+                del currmemberrecs[memberkey]
+
+        # remove member records for deleted members
+        for memberkey in currmemberrecs:
+            removedrec = currmemberrecs[memberkey]
+            memberkey = getmemberkey(removedrec)
+            members[memberkey] = [mr for mr in members[memberkey] if mr != removedrec]
+            thislogger.debug('membership removed from cache: {}'.format(removedrec))
+
+        # recreate cache file
+        # start with temporary file
+        # sort members keys for ease of debugging
+        cachedir = dirname(abspath(membercachefilename))
+        sortedmembers = sorted(members.keys())
+        with NamedTemporaryFile(mode='wb', suffix='.rsucache', delete=False, dir=cachedir) as tempcache:
+            tempmembercachefilename = tempcache.name
+            cachehdr = 'MemberID,MembershipID,MembershipType,FamilyName,GivenName,MiddleName,Gender,DOB,Email,PrimaryMember,JoinDate,ExpirationDate,LastModified'.split(',')
+            cache = DictWriter(tempcache, cachehdr)
+            cache.writeheader()
+            for memberkey in sortedmembers:
+                for memberrec in members[memberkey]:
+                    cache.writerow(memberrec)
+
+        # set mode of temp file to be same as current cache file (see https://stackoverflow.com/questions/5337070/how-can-i-get-a-files-permission-mask)
+        cachemode = stat(membercachefilename).st_mode & 0777
+        chmod(tempmembercachefilename, cachemode)
+
+        # now overwrite the previous version of the membercachefile with the new membercachefile
+        try:
+            # atomic operation in Linux
+            rename(tempmembercachefilename, membercachefilename)
+
+        # should only happen under windows
+        except OSError:
+            remove(membercachefilename)
+            rename(tempmembercachefilename, membercachefilename)
 
         # track duration of update
         finishtime = datetime.now()
@@ -321,8 +409,8 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
     # release access
     rsu.close()
 
-    # let caller know the current members
-    return currmembers
+    # let caller know the current members, in rsu api format
+    return rsumembers
 
 #----------------------------------------------------------------------
 def members2csv(club_id, key, secret, mapping, filepath=None):
