@@ -77,12 +77,11 @@ class RunSignUp():
     either key and secret OR email and password should be supplied
     key and secret take precedence
 
-    :param membercachefilename: name of optional file to cache detailed member data
-    :param debug: set to True for debug logging of http requests, default False
     :param key: key from runsignup (direct key, no OAuth)
     :param secret: secret from runsignup (direct secret, no OAuth)
     :param email: email for use by Login API (deprecated)
     :param password: password for use by Login API (deprecated)
+    :param debug: set to True for debug logging of http requests, default False
     '''
 
     #----------------------------------------------------------------------
@@ -364,8 +363,12 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
             memberkey = add2cache(memberrec)
 
             # remove member records we knew about already
+            # if not there, skip. probably replaced record in cache
             if currmember:
-                del currmemberrecs[memberkey]
+                try:
+                    del currmemberrecs[memberkey]
+                except KeyError:
+                    pass
 
         # remove member records for deleted members
         for memberkey in currmemberrecs:
