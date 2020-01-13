@@ -24,17 +24,6 @@ import version
 ez_setup.use_setuptools()
 from setuptools import setup, find_packages
 
-def globit(dir, filelist):
-    outfiles = []
-    for file in filelist:
-        filepath = '{0}/{1}'.format(dir,file)
-        gfilepath = glob.glob(filepath)
-        for i in range(len(gfilepath)):
-            f = gfilepath[i][len(dir)+1:]
-            gfilepath[i] = '{0}/{1}'.format(dir,f)  # if on windows, need to replace backslash with frontslash
-            outfiles += [gfilepath[i]]
-    return (dir, outfiles)
-
 setup(
     name = "running",
     version = version.__version__,
@@ -56,7 +45,7 @@ setup(
     # installed or upgraded on the target machine
     install_requires = [
         # 'matplotlib>=1.1.1', # not available on godaddy
-        #'loutilities>=0.5.0',
+        'loutilities>=0.14.9',
         'xlrd>=0.8.0',   
         # 'pykml>=0.1.0',       # lxml not available on godaddy
         'gpxpy>=0.7.0',
@@ -65,9 +54,8 @@ setup(
         ],
 
     # If any package contains any of these file types, include them:
-    data_files = ([
+    package_data = ([
         ]),
-
 
     entry_points = {
         'console_scripts': [
@@ -82,7 +70,6 @@ setup(
             'updatestravaclubactivitycache = running.strava:updatestravaclubactivitycache'
         ],
     },
-
 
     zip_safe = False,
 
