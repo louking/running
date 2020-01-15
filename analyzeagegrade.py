@@ -36,7 +36,7 @@ import matplotlib.font_manager as fontmgr
 from scipy import stats
 
 # home grown libraries
-import version
+from . import version
 from loutilities import timeu
 from runningclub import agegrade
 import running.runningahead as runningahead
@@ -251,8 +251,7 @@ class AnalyzeAgeGrade():
         EPS = .1   # epsilon -- if event distance is within this tolerance, it is considered the same
 
         # sort self.stats into stats, by date,distance
-        decstats = [((s.date,s.dist),s) for s in self.stats]
-        decstats.sort()
+        decstats = sorted([((s.date,s.dist),s) for s in self.stats])
         stats = [ds[1] for ds in decstats]
         
         # deduplicate stats, paying attention to priority when races determined to be the same
@@ -400,7 +399,7 @@ class AnalyzeAgeGrade():
         linenum = 0
         while True:
             try:
-                inrow = IN.next()
+                inrow = next(IN)
                 linenum += 1
             except StopIteration:
                 break
@@ -414,11 +413,11 @@ class AnalyzeAgeGrade():
             s_rtime = inrow['Net']
             timefields = iter(s_rtime.split(':'))
             rtime = 0.0
-            thisunit = float(timefields.next())
+            thisunit = float(next(timefields))
             while True:
                 rtime += thisunit
                 try:
-                    thisunit = float(timefields.next())
+                    thisunit = float(next(timefields))
                 except StopIteration:
                     break
                 rtime *= 60 # doesn't happen if last field was processed before
@@ -474,7 +473,7 @@ class AnalyzeAgeGrade():
             # if we're here, found the right user, now let's look at the workouts
             firstdate = day.asc2dt('1980-01-01')
             lastdate = day.asc2dt('2199-12-31')
-            workouts = ra.listworkouts(user['token'],begindate=firstdate,enddate=lastdate,getfields=FIELD['workout'].keys())
+            workouts = ra.listworkouts(user['token'],begindate=firstdate,enddate=lastdate,getfields=list(FIELD['workout'].keys()))
     
             # we've found the right user and collected their data, so we're done
             break
@@ -583,8 +582,7 @@ class AnalyzeAgeGrade():
             
         lines = []
         labs = []
-        l_dists = list(self.dists)
-        l_dists.sort()
+        l_dists = sorted(self.dists)
         fig.subplots_adjust(bottom=0.1, right=0.85, top=0.93)
         ax.grid(b=True)
         for thisd in l_dists:
@@ -742,7 +740,7 @@ def main():
             if len(ylim) != 2 or type(ylim[0]) not in [int,float] or type(ylim[0]) not in [int,float]:
                 raise ValueError
         except:
-            print "YLIM argument must be of the form(bottom,top), e.g., (55,80)"
+            print("YLIM argument must be of the form(bottom,top), e.g., (55,80)")
             return
     else:
         ylim = None

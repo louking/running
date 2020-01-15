@@ -75,8 +75,8 @@ import time
 from loutilities import timeu
 from loutilities import csvu
 from runningclub import agegrade
-import athlinks
-import version
+from . import athlinks
+from . import version
 
 # see http://api.athlinks.com/Enums/RaceCategories
 CAT_RUNNING = 2
@@ -89,7 +89,7 @@ class invalidParameter(Exception): pass
 resultfilehdr = 'GivenName,FamilyName,name,DOB,Gender,athlmember,athlid,race,date,loc,age,fuzzyage,miles,km,category,time,ag'.split(',')
 resultattrs = 'firstname,lastname,name,dob,gender,member,id,racename,racedate,raceloc,age,fuzzyage,distmiles,distkm,racecategory,resulttime,resultagegrade'.split(',')
 resultdates = 'dob,racedate'.split(',')
-hdrtransform = dict(zip(resultfilehdr,resultattrs))
+hdrtransform = dict(list(zip(resultfilehdr,resultattrs)))
 ftime = timeu.asctime('%Y-%m-%d')
 
 #----------------------------------------------------------------------
@@ -162,12 +162,12 @@ def collect(searchfile,outfile,begindate,enddate):
             resultage = int(result['Age'])
             if resultage != racedateage:
                 # if results are not stored as age group, skip this result
-                if (resultage/5)*5 != resultage:
+                if (resultage//5)*5 != resultage:
                     continue
                 # result's age might be age group, not exact age
                 else:
                     # if runner's age consistent with race age, use result, but mark "fuzzy"
-                    if (racedateage/5)*5 == resultage:
+                    if (racedateage//5)*5 == resultage:
                         outrec['fuzzyage'] = 'Y'
                     # otherwise skip result
                     else:
@@ -234,8 +234,8 @@ def collect(searchfile,outfile,begindate,enddate):
     _IN.close()
     
     finish = time.time()
-    print 'number of URLs retrieved = {}'.format(athl.geturlcount())
-    print 'elapsed time (min) = {}'.format((finish-start)/60)
+    print('number of URLs retrieved = {}'.format(athl.geturlcount()))
+    print('elapsed time (min) = {}'.format((finish-start)/60))
     
 ########################################################################
 class AthlinksResult():
@@ -254,7 +254,7 @@ class AthlinksResult():
             
         for attr in myattrs:
             if attr not in resultattrs:
-                raise invalidParameter,'unknown attribute: {}'.format(attr)
+                raise invalidParameter('unknown attribute: {}'.format(attr))
             setattr(self,attr,myattrs[attr])
     
     #----------------------------------------------------------------------
@@ -290,7 +290,7 @@ class AthlinksResultFile():
         :param mode: 'rb' or 'wb' -- TODO: support 'wb'
         '''
         if mode[0] not in 'r':
-            raise invalidParameter, 'mode {} not currently supported'.format(mode)
+            raise invalidParameter('mode {} not currently supported'.format(mode))
     
         self._fh = open(self.filename,mode)
         if mode[0] == 'r':
@@ -310,7 +310,7 @@ class AthlinksResultFile():
             delattr(self,'_csv')
         
     #----------------------------------------------------------------------
-    def next(self):
+    def __next__(self):
     #----------------------------------------------------------------------
         '''
         get next :class:`AthlinksResult`
@@ -318,7 +318,7 @@ class AthlinksResultFile():
         :rtype: :class:`AthlinksResult`, or None when end of file reached
         '''
         try:
-            fresult = self._csv.next()
+            fresult = next(self._csv)
             
         except StopIteration:
             return None

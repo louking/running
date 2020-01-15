@@ -18,7 +18,7 @@ import os
 import math
 
 # home grown
-import xmldict
+from . import xmldict
 
 MHR = 204               # Lou's MHR.  Change for yours
 METERPMILE = 1609.3439941
@@ -140,9 +140,9 @@ def main():
             time = float(laps[lp]['TotalTimeSeconds'])
             dist = float(laps[lp]['DistanceMeters'])        # bug in xmldict?  Seems to put into a list if any child tag has the same name
     		# hr is optional
-            hr = int(laps[lp]['AverageHeartRateBpm']['Value']) if laps[lp].has_key('AverageHeartRateBpm') else 0
+            hr = int(laps[lp]['AverageHeartRateBpm']['Value']) if 'AverageHeartRateBpm' in laps[lp] else 0
             
-            if dist <> 0.0:
+            if dist != 0.0:
             
                 # accumulate for this set
                 # for interval switch, only indicated laps are averaged

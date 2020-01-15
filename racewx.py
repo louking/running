@@ -16,7 +16,7 @@ racewx - determine weather for race day
 import pdb
 import argparse
 import datetime
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import json
 import csv
 import time
@@ -32,7 +32,7 @@ import gpxpy
 import gpxpy.geo
 
 # home grown
-import version
+from . import version
 from running import *
 from loutilities import timeu
 from loutilities import apikey
@@ -41,7 +41,7 @@ _ak = apikey.ApiKey('Lou King','running')
 try:
     _FORECASTIOKEY = _ak.getkey('forecastio')
 except apikey.unknownKey:
-    print "'forecastio' key needs to be configured using apikey"
+    print("'forecastio' key needs to be configured using apikey")
     raise
 
 WXPERIOD = 5*60    # number of seconds between weather assessments
@@ -163,18 +163,18 @@ def gettzid(lat,lon):
     params = {'location':'{lat},{lon}'.format(lat=lat,lon=lon),
               'timestamp':0,
               'sensor':'true'}
-    body = urllib.urlencode(params)
+    body = urllib.parse.urlencode(params)
     url = 'https://maps.googleapis.com/maps/api/timezone/json?{body}'.format(body=body)
     resp,jsoncontent = HTTPTZ.request(url)
 
     if resp.status != 200:
-        raise accessError, 'URL response status = {0}'.format(resp.status)
+        raise accessError('URL response status = {0}'.format(resp.status))
     
     # unmarshall the response content
     content = json.loads(jsoncontent)
 
     if content['status'] != 'OK':
-        raise accessError, 'URL content status = {0}'.format(content['status'])
+        raise accessError('URL content status = {0}'.format(content['status']))
     
     return content['timeZoneId']
     
@@ -194,7 +194,7 @@ def getwx(lat,lon,etime):
     resp,jsoncontent = HTTPWX.request(url)
     
     if resp.status != 200:
-        raise accessError, 'URL response status = {0}'.format(resp.status)
+        raise accessError('URL response status = {0}'.format(resp.status))
     
     # unmarshall the response content, and return the weather for that time
     content = json.loads(jsoncontent)

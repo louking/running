@@ -75,8 +75,8 @@ import time
 from loutilities import timeu
 from loutilities import csvu
 from runningclub import agegrade
-import ultrasignup
-import version
+from . import ultrasignup
+from . import version
 
 # see http://api.ultrasignup.com/Enums/RaceCategories
 ag = agegrade.AgeGrade()
@@ -177,7 +177,7 @@ def collect(searchfile,outfile,begindate,enddate):
             resulttime = result.racetime
 
             # int resulttime means DNF, most likely -- skip this result
-            if type(resulttime) == int: continue
+            if isinstance(resulttime, int): continue
             
             # strange case of TicksString = ':00'
             if resulttime[0] == ':':
@@ -200,8 +200,8 @@ def collect(searchfile,outfile,begindate,enddate):
     _IN.close()
     
     finish = time.time()
-    print 'number of URLs retrieved = {}'.format(ultra.geturlcount())
-    print 'elapsed time (min) = {}'.format((finish-start)/60)
+    print('number of URLs retrieved = {}'.format(ultra.geturlcount()))
+    print('elapsed time (min) = {}'.format((finish-start)/60))
     
 ########################################################################
 class UltraSignupFileResult():
@@ -279,7 +279,7 @@ class UltraSignupResultFile():
     '''
     filehdr = 'GivenName,FamilyName,name,DOB,Gender,race,date,loc,age,miles,km,time,ag'.split(',')
     # UltraSignupResultFile.filehdr needs to associate 1:1 with UltraSignupFileResult.attrs
-    hdrtransform = dict(zip(filehdr,UltraSignupFileResult.attrs))
+    hdrtransform = dict(list(zip(filehdr,UltraSignupFileResult.attrs)))
 
     resultdates = 'dob,date'.split(',')
 
@@ -297,7 +297,7 @@ class UltraSignupResultFile():
         :param mode: 'rb' or 'wb' -- TODO: support 'wb'
         '''
         if mode[0] not in 'r':
-            raise invalidParameter, 'mode {} not currently supported'.format(mode)
+            raise invalidParameter('mode {} not currently supported'.format(mode))
     
         self._fh = open(self.filename,mode)
         if mode[0] == 'r':
@@ -317,7 +317,7 @@ class UltraSignupResultFile():
             delattr(self,'_csv')
         
     #----------------------------------------------------------------------
-    def next(self):
+    def __next__(self):
     #----------------------------------------------------------------------
         '''
         get next :class:`UltraSignupFileResult`
@@ -325,7 +325,7 @@ class UltraSignupResultFile():
         :rtype: :class:`UltraSignupFileResult`, or None when end of file reached
         '''
         try:
-            fresult = self._csv.next()
+            fresult = next(self._csv)
             
         except StopIteration:
             return None

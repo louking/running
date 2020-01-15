@@ -87,7 +87,7 @@ def dist2miles(distance):
         distmiles = distance['value'] / mpermile
         
     else:
-        raise parameterError, '{0}: invalid unit returned for runningahead distance'.format(unit)
+        raise parameterError('{0}: invalid unit returned for runningahead distance'.format(unit))
     
     return distmiles
 
@@ -114,7 +114,7 @@ def dist2meters(distance):
         distmeters = distance['value']
         
     else:
-        raise parameterError, '{0}: invalid unit returned for runningahead distance'.format(unit)
+        raise parameterError('{0}: invalid unit returned for runningahead distance'.format(unit))
     
     return distmeters
 
@@ -155,7 +155,7 @@ class RunningAhead():
                 key = ak.getkey('ra')
                 secret = ak.getkey('rasecret')
             except apikey.unknownKey:
-                raise parameterError, "'ra' and 'rasecret' keys needs to be configured using apikey"
+                raise parameterError("'ra' and 'rasecret' keys needs to be configured using apikey")
         
         # Step 3 from http://api.runningahead.com/docs/authentication (using client_credentials, not authorization_code)
         # see http://requests-oauthlib.readthedocs.org/en/latest/oauth2_workflow.html#legacy-application-flow
@@ -202,7 +202,7 @@ class RunningAhead():
                     tempcache.write('{}\n'.format(json.dumps(self.membercache[id])))
 
             # set mode of temp file to be same as current cache file (see https://stackoverflow.com/questions/5337070/how-can-i-get-a-files-permission-mask)
-            cachemode = os.stat(self.membercachefilename).st_mode & 0777
+            cachemode = os.stat(self.membercachefilename).st_mode & 0o777
             os.chmod(tempmembercachefilename, cachemode)
 
             # now overwrite the previous version of the membercachefile with the new membercachefile
@@ -349,7 +349,7 @@ class RunningAhead():
         # flatten user structure, as expected by caller
         user = {}
         for raf in rauser:
-            if type(rauser[raf]) == dict:
+            if isinstance(rauser[raf], dict):
                 for f in rauser[raf]:
                     user[f] = rauser[raf][f]
             else:
@@ -437,12 +437,12 @@ class RunningAhead():
         url = 'https://api.runningahead.com/rest/{0}'.format(method)
         r = self.rasession.get(url,params=payload)
         if r.status_code != 200:
-            raise accessError, 'HTTP response code={}, url={}'.format(r.status_code,r.url)
+            raise accessError('HTTP response code={}, url={}'.format(r.status_code,r.url))
 
         content = r.json()
 
         if content['code'] != 0:
-            raise accessError, 'RA response code={}, url={}'.format(content['code'],r.url)
+            raise accessError('RA response code={}, url={}'.format(content['code'],r.url))
     
         data = content['data']
         return data 

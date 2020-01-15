@@ -29,7 +29,7 @@ competitor - access methods for competitor.com
 # standard
 import argparse
 import os.path
-import urllib
+import urllib.request, urllib.parse, urllib.error
 from bs4 import BeautifulSoup
 import unicodedata
 import logging
@@ -230,8 +230,8 @@ class competitorParse():
             rowcells.append(cell.text.strip())
             soupcells.append(cell)
             
-        soupdict = dict(zip(self.headings,soupcells))
-        rowdict = dict(zip(self.headings,rowcells))
+        soupdict = dict(list(zip(self.headings,soupcells)))
+        rowdict = dict(list(zip(self.headings,rowcells)))
         
         # try to translate integers
         for attr in rowdict:
@@ -480,7 +480,7 @@ class Competitor():
                 resp,content = self.http.request(url)
                 self.urlcount += 1
                 break
-            except Exception, e:
+            except Exception as e:
                 if retries == 0:
                     self.log.info('{} requests attempted'.format(self.geturlcount()))
                     self.log.error('http request failure, retries exceeded: {0}'.format(e))
@@ -488,7 +488,7 @@ class Competitor():
                 self.log.warning('http request failure: {0}'.format(e))
         
         if resp.status != 200:
-            raise accessError, 'URL response status = {0}'.format(resp.status)
+            raise accessError('URL response status = {0}'.format(resp.status))
         
         return content
 
@@ -503,7 +503,7 @@ class Competitor():
         :rtype: content (html)
         '''
         
-        body = urllib.urlencode(params)
+        body = urllib.parse.urlencode(params)
         url = '{}/{}?{}'.format(COMPETITOR_URL,method,body)
         content = self._geturl(url)
         

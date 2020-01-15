@@ -39,7 +39,7 @@ import logging
 # other
 
 # home grown
-import runningahead
+from . import runningahead
 filehdr = ["MemberID","MembershipType","FamilyName","GivenName","MiddleName","Gender","DOB","Email","EmailOptIn","PrimaryMember","RenewalDate","JoinDate","ExpirationDate","Street1","Street2","City","State","PostalCode","Country","Telephone","EntryType"
 ]
 from loutilities import csvwt

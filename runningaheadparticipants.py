@@ -41,7 +41,7 @@ class RunningAheadParticipant():
 
     filehdr = 'Registration Date,Event Category,Status,Bib,Last Name,First Name,Middle Name,Gender,Age,DOB,Email,Street 1,Street 2,City,State,ZIP Code,Country'.split(',')
     participantattr = 'registrationdate,category,status,bib,lname,fname,mname,gender,age,dob,email,street1,street2,city,state,zip,country'.split(',')
-    participantxlate = dict(zip(filehdr,participantattr))
+    participantxlate = dict(list(zip(filehdr,participantattr)))
 
     # only repr these fields
     reprattr = 'fname,lname,dob,registrationdate'.split(',')
@@ -89,16 +89,16 @@ class RunningAheadParticipants():
         openedhere = False
 
         # if str, assume this is the filename
-        if type(participantfile) == str:
+        if isinstance(participantfile, str):
             participantfileh = open(participantfile, 'rb')
             openedhere = True
 
         # if file, reparticipant handle
-        elif type(participantfile) == file:
+        elif isinstance(participantfile, file):
             participantfileh = participantfile
 
         # if list, it works like a handle
-        elif type(participantfile) == list:
+        elif isinstance(participantfile, list):
             participantfileh = participantfile
 
         # otherwise, not handled

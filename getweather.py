@@ -40,7 +40,7 @@ import pytz
 # other
 
 # home grown
-import version
+from . import version
 from loutilities import timeu
 
 #----------------------------------------------------------------------

@@ -31,8 +31,8 @@ from matplotlib import dates
 import matplotlib.font_manager as fm
 
 # home grown
-import version
-import racewx
+from . import version
+from . import racewx
 from running import *
 from loutilities import timeu
 
@@ -70,8 +70,8 @@ def main():
     # get range on 30 minute boundaries
     starttime = int(wxplot['time'][0])
     fintime   = int(wxplot['time'][-1])
-    adjstart  = (starttime / (30*60)) * (30*60)     # rounds to next lowest 30 minute boundary
-    adjfin    = ((fintime-1 + 30*60) / (30*60)) * (30*60)         # rounds to next highest 30 minute boundary
+    adjstart  = (starttime // (30*60)) * (30*60)     # rounds to next lowest 30 minute boundary
+    adjfin    = ((fintime-1 + 30*60) // (30*60)) * (30*60)         # rounds to next highest 30 minute boundary
     startdt = timeu.epoch2dt(adjstart)
     findt   = timeu.epoch2dt(adjfin)
     

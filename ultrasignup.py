@@ -29,7 +29,7 @@ ultrasignup - access methods for ultrasignup.com
 # standard
 import argparse
 import os.path
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import unicodedata
 import logging
 import json
@@ -292,8 +292,8 @@ class UltraSignup():
         # get the data for this athlete
         races = []
         data = self._get(RESULTS_SEARCH.format(
-                           fname=urllib.quote(fname),
-                           lname=urllib.quote(lname))
+                           fname=urllib.parse.quote(fname),
+                           lname=urllib.parse.quote(lname))
                            )
         
         content = json.loads(data)
@@ -319,7 +319,7 @@ class UltraSignup():
                 
                 # zip values into result and parse event name to get name and distances
                 result = UltraSignupResult()
-                result.set(zip(UltraSignupResult.attrs,vals))
+                result.set(list(zip(UltraSignupResult.attrs,vals)))
                 result.racename,result.distmiles,result.distkm = racenameanddist(usresult['eventname'])
                 
                 # distmiles == None if this was a timed race.  result.racetime has distance in miles
@@ -343,7 +343,7 @@ class UltraSignup():
                     return False
             return True
 
-        results = filter(_checkfilter,results)
+        results = list(filter(_checkfilter,results))
         return results
         
     #----------------------------------------------------------------------
@@ -356,7 +356,7 @@ class UltraSignup():
         :param **params: parameters for the method
         """
         
-        body = urllib.urlencode(params)
+        body = urllib.parse.urlencode(params)
         url = '{}/{}?{}'.format(ULTRASIGNUP_URL,method,body)
         
         # loop RETRIES times for timeout
@@ -368,7 +368,7 @@ class UltraSignup():
                 resp,content = self.http.request(url)
                 self.urlcount += 1
                 break
-            except Exception, e:
+            except Exception as e:
                 if retries == 0:
                     self.log.info('{} requests attempted'.format(self.geturlcount()))
                     self.log.error('http request failure, retries exceeded: {0}'.format(e))
@@ -376,7 +376,7 @@ class UltraSignup():
                 self.log.warning('http request failure: {0}'.format(e))
         
         if resp.status != 200:
-            raise accessError, 'URL response status = {0}'.format(resp.status)
+            raise accessError('URL response status = {0}'.format(resp.status))
         
         return content 
         

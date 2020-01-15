@@ -53,11 +53,11 @@ import matplotlib.pyplot as plt
 # home grown
 from loutilities import timeu
 from runningclub import render as ren
-import analyzeagegrade
-import athlinksresults
-import ultrasignupresults
-import runningaheadresults
-import version
+from . import analyzeagegrade
+from . import athlinksresults
+from . import ultrasignupresults
+from . import runningaheadresults
+from . import version
 
 class invalidParameter(Exception): pass
 METERSPERMILE = 1609.344
@@ -114,7 +114,7 @@ def collectathlinks(aag,athlinksfile):
     # read records from athlinksfile
     # gather each individual's result statistics, render later
     while True:
-        result = athlf.next()
+        result = next(athlf)
         if result is None: break
         
         thisname = result.name.lower()
@@ -145,7 +145,7 @@ def collectultrasignup(aag,ultrasignupfile):
     # read records from ultrasignupfile
     # gather each individual's result statistics, render later
     while True:
-        result = ultra.next()
+        result = next(ultra)
         if result is None: break
         
         thisname = result.name.lower()
@@ -175,7 +175,7 @@ def collectrunningahead(aag,runningaheadfile):
     # read records from runningaheadfile
     # gather each individual's result statistics, render later
     while True:
-        result = rafile.next()
+        result = next(rafile)
         if result is None: break
         
         thisname = result.name.lower()
@@ -221,7 +221,7 @@ def collectclub(aag,clubfile):
         # if we've completed the last runner's result collection,
         # render the results, and set up for the next runner
         try:
-            row = clubf.next()
+            row = next(clubf)
             result = ClubResult(row['name'],row['dob'],row['gender'],row['race'],row['date'],row['miles'],row['km'],row['time'],row['ag'])
         except StopIteration:
             result = None
@@ -257,7 +257,7 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
     '''
     firstyear = begindate.year
     lastyear = enddate.year
-    yearrange = range(firstyear,lastyear+1)
+    yearrange = list(range(firstyear,lastyear+1))
     
     summfields = ['name','age','gender']
     distcategories = ['overall'] + [TRENDLIMITS[tlimit][0] for tlimit in TRENDLIMITS]
@@ -461,7 +461,7 @@ def main():
     
     # need data source file
     if not athlinksfile and not clubfile and not ultrasignupfile and not runningaheadfile:
-        raise invalidParameter, 'athlinksfile, ultrasignupfile, runningaheadfile and/or clubfile required'
+        raise invalidParameter('athlinksfile, ultrasignupfile, runningaheadfile and/or clubfile required')
 
     # collect data from athlinks, if desired
     if athlinksfile:

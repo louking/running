@@ -30,7 +30,7 @@ athlinks - access methods for athlinks.com
 import pdb
 import argparse
 import os.path
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import json
 import time
 import logging
@@ -87,7 +87,7 @@ def dist2miles(distunit,disttypeid):
     :param disttypeid: meters=6, others unknown
     '''
     if disttypeid != 6:
-        raise parameterError, 'unknown disttypeid {}'.format(disttypeid)
+        raise parameterError('unknown disttypeid {}'.format(disttypeid))
     return distunit / MPERMILE
 
 #----------------------------------------------------------------------
@@ -100,7 +100,7 @@ def dist2km(distunit,disttypeid):
     :param disttypeid: meters=6, others unknown
     '''
     if disttypeid != 6:
-        raise parameterError, 'unknown disttypeid {}'.format(disttypeid)
+        raise parameterError('unknown disttypeid {}'.format(disttypeid))
     return distunit / 1000
 
 ########################################################################
@@ -123,7 +123,7 @@ class Athlinks():
             try:
                 self.key = ak.getkey('athlinks')
             except apikey.unknownKey:
-                raise parameterError, "'athlinks' key needs to be configured using apikey"
+                raise parameterError("'athlinks' key needs to be configured using apikey")
         
         # need http object
         self.http = httplib2.Http(timeout=HTTPTIMEOUT)
@@ -187,11 +187,11 @@ class Athlinks():
 
         def _checkfilter(checkdict):
             for key in filt:
-                if not checkdict.has_key(key) or checkdict[key] != filt[key]:
+                if key not in checkdict or checkdict[key] != filt[key]:
                     return False
             return True
 
-        races = filter(_checkfilter,races)
+        races = list(filter(_checkfilter,races))
         return races
         
     #----------------------------------------------------------------------
@@ -202,7 +202,7 @@ class Athlinks():
         
         :param handle: handle for member, ID or email should work
         '''
-        handle = urllib.quote(str(handle))
+        handle = urllib.parse.quote(str(handle))
         data = self._get(MEMBER_DETAILS.format(handle=handle)
                            )
         return data
@@ -244,7 +244,7 @@ class Athlinks():
         params['format'] = 'json'
         params['key'] = self.key
         
-        body = urllib.urlencode(params)
+        body = urllib.parse.urlencode(params)
         url = '{}/{}?{}'.format(ATHLINKS_URL,method,body)
         
         # loop RETRIES times for timeout or other error
@@ -256,7 +256,7 @@ class Athlinks():
                 resp,jsoncontent = self.http.request(url)
 
                 if resp.status != 200:
-                    raise accessError, 'URL response status = {0}'.format(resp.status)
+                    raise accessError('URL response status = {0}'.format(resp.status))
                 
                 # unmarshall the response content
                 content = json.loads(jsoncontent)
@@ -264,7 +264,7 @@ class Athlinks():
                 self.urlcount += 1
                 break
 
-            except Exception, e:
+            except Exception as e:
                 if retries == 0:
                     self.log.info('{} requests attempted'.format(self.geturlcount()))
                     self.log.error('http request failure, retries exceeded: {0}'.format(e))

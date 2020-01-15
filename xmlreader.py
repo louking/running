@@ -1,6 +1,6 @@
 import sys
 from xml import sax
-from textnormalize import text_normalize_filter
+from .textnormalize import text_normalize_filter
 import pdb
 
 #Subclass from ContentHandler in order to gain default behaviors
@@ -18,24 +18,24 @@ class label_dict_handler(sax.ContentHandler):
         return
 
     def startElement(self, name, attributes):
-        if name == u"label":
+        if name == "label":
             self._curr_label = {}
-        if name == u"address":
+        if name == "address":
             self._address = {}
-        if name == u"name":
+        if name == "name":
             self._state = self.CAPTURE_KEY
-        if name == u"quote":
+        if name == "quote":
             self._item_to_create = name
             self._state = self.CAPTURE_LABEL_ITEM
-        if name in [u"street", u"city", u"state"]:
+        if name in ["street", "city", "state"]:
             self._item_to_create = name
             self._state = self.CAPTURE_ADDRESS_ITEM
         return
 
     def endElement(self, name):
-        if name == u"address":
+        if name == "address":
             self._curr_label["address"] = self._address
-        if name in [u"quote", u"name", u"street", u"city", u"state"]:
+        if name in ["quote", "name", "street", "city", "state"]:
             self._state = None
         return
 
@@ -47,9 +47,9 @@ class label_dict_handler(sax.ContentHandler):
             curr_dict = self._address
         if self._state == self.CAPTURE_LABEL_ITEM:
             curr_dict = self._curr_label
-        print repr(text), curr_dict
+        print(repr(text), curr_dict)
         if curr_dict is not None:
-            if curr_dict.has_key(self._item_to_create):
+            if self._item_to_create in curr_dict:
                 curr_dict[self._item_to_create] += text
             else:
                 curr_dict[self._item_to_create] = text

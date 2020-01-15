@@ -46,7 +46,7 @@ class RunningAheadMember():
     # translate selected fields of file header to attributes we want to keep
     filehdr = 'MembershipType,FamilyName,GivenName,MiddleName,Gender,DOB,Email,EmailOptIn,PrimaryMember,RenewalDate,JoinDate,ExpirationDate,Street1,Street2,City,State,PostalCode,Country,Telephone,EntryType'.split(',')
     memberattr = 'membershiptype,lname,fname,mname,gender,dob,email,emailoptin,primarymember,renew,join,expiration,street1,street2,city,state,zip,country,telephone,entrytype'.split(',')
-    memberxlate = dict(zip(filehdr,memberattr))
+    memberxlate = dict(list(zip(filehdr,memberattr)))
 
     # only repr these fields
     reprattr = 'fname,lname,dob,join,renew,expiration'.split(',')
@@ -100,12 +100,12 @@ class RunningAheadMembers():
         openedhere = False
 
         # if str, assume this is the filename
-        if type(memberfile) == str:
+        if isinstance(memberfile, str):
             memberfileh = open(memberfile, 'rb')
             openedhere = True
 
         # if file, remember handle
-        elif type(memberfile) == file:
+        elif isinstance(memberfile, file):
             memberfileh = memberfile
 
         # if list, it works like a handle

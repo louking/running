@@ -82,8 +82,8 @@ def main():
     # analyze every 5 seconds of data, interpolating between points, for all overlapping tracks
     earliest = max(times[0][0], times[1][0])    #max forces intersection
     latest = min(times[0][-1], times[1][-1])    #min forces intersection
-    earliest = (int(earliest+5)/5)*5    # round to next 5 second boundary
-    latest = (int(latest)/5)*5          # round to last 5 second boundary
+    earliest = (int(earliest+5)//5)*5    # round to next 5 second boundary
+    latest = (int(latest)//5)*5          # round to last 5 second boundary
     
     results = {}
     for f in range(2):
@@ -93,7 +93,7 @@ def main():
         ddeq = collections.deque([],2)
         try:
             for time in range(earliest,latest,5):
-                if not results.has_key(time):
+                if time not in results:
                     results[time] = {0:None, 1:None}
 
                 while len(tdeq) < 2 or tdeq[-1] < time: # try to scan times to get mult 5 time between measured time points

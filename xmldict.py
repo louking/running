@@ -62,7 +62,7 @@ def nodeToDic(node):
         if sibs.count(n.nodeName) > 1:
             multiple = True 
             # and set up the list to hold the values
-            if not multlist.has_key(n.nodeName):
+            if n.nodeName not in multlist:
                 multlist[n.nodeName] = []
         
         try:

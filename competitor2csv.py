@@ -24,8 +24,8 @@ from string import maketrans
 from collections import OrderedDict
 
 # home grown libraries
-import version
-from competitor import Competitor
+from . import version
+from .competitor import Competitor
 
 # convert competitorResult to expected format for runningclub.RaceResults
 competitor2raceresult = OrderedDict([
@@ -80,7 +80,7 @@ def getcompetitorrace(outfile,eventid,eventinstanceid,singleeventid,limit=None):
     
     # open output results file
     RS_ = open(outfilename,'wb')
-    RS = csv.DictWriter(RS_,competitor2raceresult.values())
+    RS = csv.DictWriter(RS_,list(competitor2raceresult.values()))
     RS.writeheader()
     
     # write the results to the file
@@ -142,7 +142,7 @@ def main():
     
     # only collect information from competitor.com if output file is defined
     resultfile = getcompetitorrace(outfile,eventid,instanceid,singleeventid,limit)
-    print('generated {}'.format(resultfile))
+    print(('generated {}'.format(resultfile)))
         
 # ###############################################################################
 # ###############################################################################

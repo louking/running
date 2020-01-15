@@ -19,7 +19,7 @@ import glob
 import pdb
 
 # home grown
-import version
+from . import version
 
 ez_setup.use_setuptools()
 from setuptools import setup, find_packages

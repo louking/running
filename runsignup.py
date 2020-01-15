@@ -107,11 +107,11 @@ class RunSignUp():
             requests_log.propagate = False
 
         if (not key and not email):
-            raise parameterError, 'either key/secret or email/password must be supplied'
+            raise parameterError('either key/secret or email/password must be supplied')
         if (key and not secret) or (secret and not key):
-            raise parameterError, 'key and secret must be supplied together'
+            raise parameterError('key and secret must be supplied together')
         if (email and not password) or (password and not email):
-            raise parameterError, 'email and password must be supplied together'
+            raise parameterError('email and password must be supplied together')
 
         self.key = key
         self.secret = secret
@@ -217,12 +217,12 @@ class RunSignUp():
 
         resp = self.session.get(methodurl, params=thispayload)
         if resp.status_code != 200:
-            raise accessError, 'HTTP response code={}, url={}'.format(resp.status_code,resp.url)
+            raise accessError('HTTP response code={}, url={}'.format(resp.status_code,resp.url))
 
         data = resp.json()
 
         if 'error' in data:
-            raise accessError, 'RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url)
+            raise accessError('RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url))
     
         return data 
         
@@ -392,7 +392,7 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
                     cache.writerow(memberrec)
 
         # set mode of temp file to be same as current cache file (see https://stackoverflow.com/questions/5337070/how-can-i-get-a-files-permission-mask)
-        cachemode = stat(membercachefilename).st_mode & 0777
+        cachemode = stat(membercachefilename).st_mode & 0o777
         chmod(tempmembercachefilename, cachemode)
 
         # now overwrite the previous version of the membercachefile with the new membercachefile

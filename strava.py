@@ -29,7 +29,7 @@ strava - access methods for strava.com
 # standard
 import pdb
 import argparse
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import json
 import time
 import logging
@@ -46,7 +46,7 @@ import requests
 # other
 
 # home grown
-import version
+from . import version
 from loutilities import apikey
 from loutilities import timeu
 from loutilities.csvwt import record2csv
@@ -110,7 +110,7 @@ class Strava():
                 # secret = ak.getkey('stravasecret')
                 user = ak.getkey('stravauser')
             except apikey.unknownKey:
-                raise parameterError, "'stravauser' needs to be configured using apikey"
+                raise parameterError("'stravauser' needs to be configured using apikey")
         else:
             user = key
         
@@ -331,7 +331,7 @@ class Strava():
                 ('time(s)',         'elapsed_time'),
             ])
 
-        activities = self.clubactivitycache.values()
+        activities = list(self.clubactivitycache.values())
         csvrecords = record2csv(activities,mapping,outfile=outfile)
         return csvrecords
 
@@ -367,7 +367,7 @@ def updatestravaclubactivitycache():
     args = parser.parse_args()
 
     # let user know what is going on
-    print 'Updating Strava club activity cache for "{}"'.format(args.clubname)
+    print('Updating Strava club activity cache for "{}"'.format(args.clubname))
 
     # configuration file supplied -- pull credentials from the app section
     if args.configfile:
@@ -403,10 +403,10 @@ def updatestravaclubactivitycache():
     ss.close()
 
     # let user know how we did
-    print '   update complete:'
-    print '      {} activities received from Strava'.format(len(activities))
-    print '      added {} of these to cache'.format(numadded)
-    print '      new cache size = {}'.format(cachesize)
+    print('   update complete:')
+    print('      {} activities received from Strava'.format(len(activities)))
+    print('      added {} of these to cache'.format(numadded))
+    print('      new cache size = {}'.format(cachesize))
 
 #----------------------------------------------------------------------
 def main(): 

@@ -80,9 +80,9 @@ from loutilities import timeu
 from loutilities import csvu
 from runningclub import agegrade
 from runningclub import render
-import runningahead
-from runningahead import FIELD
-import version
+from . import runningahead
+from .runningahead import FIELD
+from . import version
 
 ag = agegrade.AgeGrade()
 class invalidParameter(Exception): pass
@@ -167,7 +167,7 @@ def collect(searchfile,outfile,begindate,enddate):
         #if todayage < 14: continue
         
         # if we're here, found the right user, now let's look at the workouts
-        workouts = ra.listworkouts(user['token'],begindate=a_begindate,enddate=a_enddate,getfields=FIELD['workout'].keys())
+        workouts = ra.listworkouts(user['token'],begindate=a_begindate,enddate=a_enddate,getfields=list(FIELD['workout'].keys()))
 
         # save race workouts, if any found
         results = []
@@ -179,7 +179,7 @@ def collect(searchfile,outfile,begindate,enddate):
                 dt_thisdate = fdate.asc2dt(thisdate)
                 thisdist = runningahead.dist2meters(wo['details']['distance'])
                 thistime = wo['details']['duration']
-                thisrace = wo['course']['name'] if wo.has_key('course') else 'unknown'
+                thisrace = wo['course']['name'] if 'course' in wo else 'unknown'
                 if thistime == 0:
                     log.warning('{} has 0 time for {} {}'.format(membername,thisrace,thisdate))
                     continue
@@ -212,7 +212,7 @@ def collect(searchfile,outfile,begindate,enddate):
     _IN.close()
     
     finish = time.time()
-    print 'elapsed time (min) = {}'.format((finish-start)/60)
+    print('elapsed time (min) = {}'.format((finish-start)/60))
     
 ########################################################################
 class RunningAheadFileResult():
@@ -285,7 +285,7 @@ class RunningAheadResultFile():
     '''
     filehdr = 'GivenName,FamilyName,name,DOB,Gender,race,date,age,miles,km,time'.split(',')
     # RunningAheadResultFile.filehdr needs to associate 1:1 with RunningAheadFileResult.attrs
-    hdrtransform = dict(zip(filehdr,RunningAheadFileResult.attrs))
+    hdrtransform = dict(list(zip(filehdr,RunningAheadFileResult.attrs)))
 
     resultdates = 'dob,date'.split(',')
 
@@ -303,7 +303,7 @@ class RunningAheadResultFile():
         :param mode: 'rb' or 'wb' -- TODO: support 'wb'
         '''
         if mode[0] not in 'r':
-            raise invalidParameter, 'mode {} not currently supported'.format(mode)
+            raise invalidParameter('mode {} not currently supported'.format(mode))
     
         self._fh = open(self.filename,mode)
         if mode[0] == 'r':
@@ -323,7 +323,7 @@ class RunningAheadResultFile():
             delattr(self,'_csv')
         
     #----------------------------------------------------------------------
-    def next(self):
+    def __next__(self):
     #----------------------------------------------------------------------
         '''
         get next :class:`RunningAheadFileResult`
@@ -331,7 +331,7 @@ class RunningAheadResultFile():
         :rtype: :class:`RunningAheadFileResult`, or None when end of file reached
         '''
         try:
-            fresult = self._csv.next()
+            fresult = next(self._csv)
             
         except StopIteration:
             return None
