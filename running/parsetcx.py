@@ -10,7 +10,6 @@
 # ##########################################################################################
 
 # standard
-import pdb
 import optparse
 import datetime
 import re
@@ -18,7 +17,7 @@ import os
 import math
 
 # home grown
-from . import xmldict
+from running.running import xmldict
 
 MHR = 204               # Lou's MHR.  Change for yours
 METERPMILE = 1609.3439941

@@ -58,8 +58,6 @@ Usage::
 
 # standard
 import argparse
-import os.path
-import tempfile
 import csv
 import datetime
 import time
@@ -80,9 +78,8 @@ from loutilities import timeu
 from loutilities import csvu
 from runningclub import agegrade
 from runningclub import render
-from . import runningahead
 from .runningahead import FIELD
-from . import version
+from running.running import version, runningahead
 
 ag = agegrade.AgeGrade()
 class invalidParameter(Exception): pass
@@ -370,8 +367,8 @@ def main():
         * State - state of residence [optional]
     '''
     
-    parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('running',version.__version__))
+    parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     version='{0} {1}'.format('running', version.__version__))
     parser.add_argument('searchfile', help="file with names, genders and birth dates of athletes to search for")
     parser.add_argument('outfile', help="output file contains race results")
     parser.add_argument('-b','--begindate', help="choose races between begindate and enddate, yyyy-mm-dd",default=None)

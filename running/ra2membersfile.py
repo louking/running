@@ -28,7 +28,6 @@ ra2membersfile - retrieve RunningAHEAD member file to be put into file similar t
 
 # standard
 import unicodecsv
-import pdb
 import argparse
 import logging
 
@@ -39,7 +38,8 @@ import logging
 # other
 
 # home grown
-from . import runningahead
+from running.running import runningahead
+
 filehdr = ["MemberID","MembershipType","FamilyName","GivenName","MiddleName","Gender","DOB","Email","EmailOptIn","PrimaryMember","RenewalDate","JoinDate","ExpirationDate","Street1","Street2","City","State","PostalCode","Country","Telephone","EntryType"
 ]
 from loutilities import csvwt

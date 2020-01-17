@@ -18,9 +18,7 @@ Usage::
 
 # standard libraries
 import csv
-import pdb
 import argparse
-import math
 import time
 import logging
 logging.basicConfig(format='%(asctime)s %(levelname)s: %(message)s')
@@ -36,11 +34,11 @@ import matplotlib.font_manager as fontmgr
 from scipy import stats
 
 # home grown libraries
-from . import version
+from running.running import version
 from loutilities import timeu
 from runningclub import agegrade
-import running.runningahead as runningahead
-from running.runningahead import FIELD
+import running.running.runningahead as runningahead
+from running.running.runningahead import FIELD
 
 class unexpectedEOF(Exception): pass
 class invalidParameter(Exception): pass

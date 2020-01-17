@@ -27,9 +27,7 @@ strava - access methods for strava.com
 '''
 
 # standard
-import pdb
 import argparse
-import urllib.request, urllib.parse, urllib.error
 import json
 import time
 import logging
@@ -46,7 +44,7 @@ import requests
 # other
 
 # home grown
-from . import version
+from running.running import version
 from loutilities import apikey
 from loutilities import timeu
 from loutilities.csvwt import record2csv
@@ -359,8 +357,8 @@ def updatestravaclubactivitycache():
     script to update the strava club activity cache
     '''
     
-    parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('running',version.__version__))
+    parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     version='{0} {1}'.format('running', version.__version__))
     parser.add_argument('cachefile', help="pathname of file in which cache is saved")
     parser.add_argument('clubname', help="full name of club as known to strava")
     parser.add_argument('--configfile', help='optional configuration filename', default=None)
@@ -415,8 +413,8 @@ def main():
     unit test for strava.py
     '''
     
-    parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('running',version.__version__))
+    parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     version='{0} {1}'.format('running', version.__version__))
     args = parser.parse_args()
 
     # this would be a good place for unit tests

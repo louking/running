@@ -34,9 +34,7 @@ Usage::
 '''
 
 # standard
-import pdb
 import argparse
-import tempfile
 import csv
 import datetime
 import collections
@@ -53,11 +51,8 @@ import matplotlib.pyplot as plt
 # home grown
 from loutilities import timeu
 from runningclub import render as ren
-from . import analyzeagegrade
-from . import athlinksresults
-from . import ultrasignupresults
-from . import runningaheadresults
-from . import version
+from running.running import ultrasignupresults, analyzeagegrade, athlinksresults, version, runningaheadresults
+
 
 class invalidParameter(Exception): pass
 METERSPERMILE = 1609.344
@@ -275,7 +270,7 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
     SUMM.writeheader()
     
     detailfname = detailfile.format(date=tfile.epoch2asc(time.time()))
-    detlfields = ['name','dob','gender'] + analyzeagegrade.AgeGradeStat.attrs + ['distmiles','distkm','rendertime']
+    detlfields = ['name','dob','gender'] + analyzeagegrade.AgeGradeStat.attrs + ['distmiles', 'distkm', 'rendertime']
     detlfields.remove('priority')   # priority is internal
     _DETL = open(detailfname,'wb')
     DETL = csv.DictWriter(_DETL,detlfields,extrasaction='ignore')
@@ -418,8 +413,8 @@ def main():
     render race results from athlinks, club
     '''
     
-    parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('running',version.__version__))
+    parser = argparse.ArgumentParser(description=descr, formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     version='{0} {1}'.format('running', version.__version__))
     parser.add_argument('-c','--clubfile', help="file with club results, output from exportresults",default=None)
     parser.add_argument('-a','--athlinksfile', help="file with athlinks results, output from athlinksresults",default=None)
     parser.add_argument('-u','--ultrasignupfile', help="file with club results, output from ultrasignupresults",default=None)

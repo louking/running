@@ -13,9 +13,7 @@ racewx - determine weather for race day
 '''
 
 # standard
-import pdb
 import argparse
-import datetime
 import urllib.request, urllib.parse, urllib.error
 import json
 import csv
@@ -32,7 +30,7 @@ import gpxpy
 import gpxpy.geo
 
 # home grown
-from . import version
+from running.running import version
 from running import *
 from loutilities import timeu
 from loutilities import apikey
@@ -204,7 +202,7 @@ def getwx(lat,lon,etime):
 def main():
 #----------------------------------------------------------------------
 
-    parser = argparse.ArgumentParser(version='{0} {1}'.format('running',version.__version__))
+    parser = argparse.ArgumentParser(version='{0} {1}'.format('running', version.__version__))
     parser.add_argument('gpxfile',help='gpx formatted file')
     parser.add_argument('racestarttime',help="time of race start in '%%Y-%%m-%%dT%%H:%%M' format")
     parser.add_argument('-o','--output',help='name of output file (default %(default)s)',default='racewx.csv')

@@ -18,13 +18,12 @@ Usage::
 
 # standard libraries
 import csv
-import pdb
 import argparse
 from string import maketrans
 from collections import OrderedDict
 
 # home grown libraries
-from . import version
+from running.running import version
 from .competitor import Competitor
 
 # convert competitorResult to expected format for runningclub.RaceResults

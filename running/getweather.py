@@ -27,21 +27,18 @@ getweather - get specified weather information from forecast.io
 
 '''
 # standard
-import pdb
 import argparse
 import textwrap
-import csv
 
 # pypi
-import pytz 
 
 # github
 
 # other
 
 # home grown
-from . import version
-from loutilities import timeu
+from running.running import version
+
 
 #----------------------------------------------------------------------
 def main():
@@ -89,7 +86,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=description,
         epilog=epilog,
-        version='{0} {1}'.format('running',version.__version__))
+        version='{0} {1}'.format('running', version.__version__))
     parser.add_argument('gpxfile',help='gpx file containing course')
     parser.add_argument('paramsfile',help='file containing parameters')
     parser.add_argument('outfile',help='csv file containing output from queries')

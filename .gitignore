@@ -1,7 +1,7 @@
 # specific project files
-xmldict1.py
-xmldict2.py
-parserun-bk3.py
+running/xmldict1.py
+running/xmldict2.py
+running/parserun-bk3.py
 
 #################
 ## Eclipse
