@@ -193,7 +193,7 @@ def collectclub(aag,clubfile):
     :param clubfile: file with club results, output from runningclub.exportresults
     '''
     # reading clubfile
-    _clubf = open(clubfile,'rb')
+    _clubf = open(clubfile,'r',newline='')
     clubf = csv.DictReader(_clubf)
     
     # TODO: move this to exportresults, a la athlinksresults; rename exportresults to clubresults
@@ -265,14 +265,14 @@ def render(aag,outfile,summaryfile,detailfile,minagegrade,minraces,mintrend,begi
     
     tfile = timeu.asctime('%Y-%m-%d')
     summaryfname = summaryfile.format(date=tfile.epoch2asc(time.time()))
-    _SUMM = open(summaryfname,'wb')
+    _SUMM = open(summaryfname,'w',newline='')
     SUMM = csv.DictWriter(_SUMM,summfields)
     SUMM.writeheader()
     
     detailfname = detailfile.format(date=tfile.epoch2asc(time.time()))
     detlfields = ['name','dob','gender'] + analyzeagegrade.AgeGradeStat.attrs + ['distmiles', 'distkm', 'rendertime']
     detlfields.remove('priority')   # priority is internal
-    _DETL = open(detailfname,'wb')
+    _DETL = open(detailfname,'w',newline='')
     DETL = csv.DictWriter(_DETL,detlfields,extrasaction='ignore')
     DETL.writeheader()
     

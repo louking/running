@@ -28,7 +28,7 @@ def main():
 
     textresults = args.pop(0)
     IN = open(textresults, 'r')
-    _OUT = open('{0}.csv'.format(textresults),'wb')
+    _OUT = open('{0}.csv'.format(textresults),'w',newline='')
     OUT = csv.writer(_OUT)
     
     hdrqueue = []

@@ -390,7 +390,7 @@ class AnalyzeAgeGrade():
         :rtype: 
         '''
         
-        _IN = open(agfile,'r')
+        _IN = open(agfile,newline='')
         IN = csv.DictReader(_IN,dialect='excel')
     
         # collect data
@@ -506,7 +506,7 @@ class AnalyzeAgeGrade():
         debug = False
         if debug:
             tim = timeu.asctime('%Y-%m-%d-%H%M')
-            _DEB = open('analyzeagegrade-debug-{}-crunch-{}.csv'.format(tim.epoch2asc(self.exectime,self.who)),'wb')
+            _DEB = open('analyzeagegrade-debug-{}-crunch-{}.csv'.format(tim.epoch2asc(self.exectime,self.who)),'w',newline='')
             fields = ['date','dist','time','ag']
             DEB = csv.DictWriter(_DEB,fields)
             DEB.writeheader()
@@ -547,7 +547,7 @@ class AnalyzeAgeGrade():
         debug = False
         if debug:
             tim = timeu.asctime('%Y-%m-%d-%H-%M')
-            _DEB = open('analyzeagegrade-debug-{}-render.csv'.format(tim.epoch2asc(self.exectime)),'wb')
+            _DEB = open('analyzeagegrade-debug-{}-render.csv'.format(tim.epoch2asc(self.exectime)),'w',newline='')
             fields = ['date','dist','ag','color','label']
             DEB = csv.DictWriter(_DEB,fields)
             DEB.writeheader()

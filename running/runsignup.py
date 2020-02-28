@@ -290,7 +290,7 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
 
         # keep list sorted
         sortby = 'ExpirationDate'
-        members[memberkey].sort(lambda a,b: cmp(a[sortby],b[sortby]))
+        members[memberkey].sort(key=lambda item: item[sortby])
 
         # remove any overlaps
         for i in range(1, len(members[memberkey])):
@@ -327,7 +327,7 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
         # import current cache
         # records in cache are organized in members dict with 'last,first,dob' key
         # within is list of memberships ordered by expiration date
-        with open(membercachefilename, 'rb') as memfile:
+        with open(membercachefilename, newline='') as memfile:
             # members maintains the current cache through this processing
             # currmemberrecs maintains the records for current members as of today
             cachedmembers = DictReader(memfile)
@@ -382,7 +382,7 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
         # sort members keys for ease of debugging
         cachedir = dirname(abspath(membercachefilename))
         sortedmembers = sorted(members.keys())
-        with NamedTemporaryFile(mode='wb', suffix='.rsucache', delete=False, dir=cachedir) as tempcache:
+        with NamedTemporaryFile(mode='w', suffix='.rsucache', delete=False, dir=cachedir, newline='') as tempcache:
             tempmembercachefilename = tempcache.name
             cachehdr = 'MemberID,MembershipID,MembershipType,FamilyName,GivenName,MiddleName,Gender,DOB,Email,PrimaryMember,JoinDate,ExpirationDate,LastModified'.split(',')
             cache = DictWriter(tempcache, cachehdr)

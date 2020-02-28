@@ -152,7 +152,7 @@ def ra2members(club, accesstoken, membercachefilename=None, update=False, filena
     
     # write the file if requested
     if filename:
-        with open(filename,'wb') as outfile:
+        with open(filename,'w',newline='') as outfile:
             outfile.writelines(memberlist)
 
     return memberlist
@@ -166,7 +166,7 @@ def file2members(fname):
     :param fname: name of file
     :rtype: list of strings read from file, suitable for input to csv.DictReader
     '''
-    with open(fname,'rb') as infile:
+    with open(fname,'r',newline='') as infile:
         memberlist = infile.readlines()
 
     return memberlist

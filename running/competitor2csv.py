@@ -78,7 +78,7 @@ def getcompetitorrace(outfile,eventid,eventinstanceid,singleeventid,limit=None):
     outfilename = '{}-{}-{}.csv'.format(outfile,tracename,dist)
     
     # open output results file
-    RS_ = open(outfilename,'wb')
+    RS_ = open(outfilename,'w',newline='')
     RS = csv.DictWriter(RS_,list(competitor2raceresult.values()))
     RS.writeheader()
     

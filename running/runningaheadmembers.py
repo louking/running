@@ -101,7 +101,7 @@ class RunningAheadMembers():
 
         # if str, assume this is the filename
         if isinstance(memberfile, str):
-            memberfileh = open(memberfile, 'rb')
+            memberfileh = open(memberfile, 'r', newline='')
             openedhere = True
 
         # if file, remember handle
@@ -140,7 +140,7 @@ class RunningAheadMembers():
 
         #debug
         if overlapfile:
-            _OVRLP = open(overlapfile,'wb')
+            _OVRLP = open(overlapfile,'w',newline='')
             OVRLP = csv.DictWriter(_OVRLP,['MemberID','name','dob','renewal','join','expiration','tossed'],extrasaction='ignore')
             OVRLP.writeheader()
 

@@ -94,9 +94,9 @@ def collect(searchfile,outfile,begindate,enddate):
     '''
     
     # open files
-    _IN = open(searchfile,'rb')
+    _IN = open(searchfile,'r',newline='')
     IN = csv.DictReader(_IN)
-    _OUT = open(outfile,'wb')
+    _OUT = open(outfile,'w',newline='')
     OUT = csv.DictWriter(_OUT,UltraSignupResultFile.filehdr)
     OUT.writeheader()
 
@@ -286,17 +286,17 @@ class UltraSignupResultFile():
         self.filename = filename
         
     #----------------------------------------------------------------------
-    def open(self,mode='rb'):
+    def open(self,mode='r'):
     #----------------------------------------------------------------------
         '''
         open ultrasignup result file
         
-        :param mode: 'rb' or 'wb' -- TODO: support 'wb'
+        :param mode: 'r' or 'w' -- TODO: support 'w'
         '''
         if mode[0] not in 'r':
             raise invalidParameter('mode {} not currently supported'.format(mode))
     
-        self._fh = open(self.filename,mode)
+        self._fh = open(self.filename,mode,newline='')
         if mode[0] == 'r':
             self._csv = csv.DictReader(self._fh)
         else:

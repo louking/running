@@ -255,10 +255,10 @@ def main():
     # create the file and write header if it doesn't exist
     if not os.path.exists(output):
         writeheader = True
-        _WX = open(output,'wb')
+        _WX = open(output,'w',newline='')
     else:
         writeheader = False        
-        _WX = open(output,'ab')
+        _WX = open(output,'a',newline='')
         
     heading = ['exectime', 'time', 'lat', 'lon', 'temperature', 'humidity', 'dewpoint', 'windchill', 'heatindex', 'precipType', 'precipProbability', 'precipIntensity', 'windSpeed', 'windBearing', 'cloudCover', 'summary', 'pressure', 'visibility']
     WX = csv.DictWriter(_WX,heading,extrasaction='ignore')

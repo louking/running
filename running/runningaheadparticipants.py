@@ -90,7 +90,7 @@ class RunningAheadParticipants():
 
         # if str, assume this is the filename
         if isinstance(participantfile, str):
-            participantfileh = open(participantfile, 'rb')
+            participantfileh = open(participantfile, 'r', newline='')
             openedhere = True
 
         # if file, reparticipant handle

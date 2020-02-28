@@ -46,7 +46,7 @@ def main():
     racename = args.racename
 
     # get input
-    _WX = open(infile,'rb')
+    _WX = open(infile,'r',newline='')
     WX = csv.DictReader(_WX)
     wxdata = []
     for wx in WX:
