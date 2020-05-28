@@ -57,7 +57,7 @@ setup(
     install_requires = [
         'requests>=2.22.0',
         'requests_oauthlib>=1.3.0',
-        'loutilities>=3.0.0',
+        'loutilities>=3.3.0',
         'tzlocal>=2.0.0',
         'xlrd>=1.2.0',
         'unicodecsv>=0.14.1',
