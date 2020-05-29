@@ -457,6 +457,7 @@ class ClubMembership():
         'street': lambda mem: mem['user']['address']['street'] if 'address' in mem['user'] and 'street' in mem['user']['address'] else '',
         'city': lambda mem: mem['user']['address']['city'] if 'address' in mem['user'] and 'city' in mem['user']['address'] else '',
         'state': lambda mem: mem['user']['address']['state'] if 'address' in mem['user'] and 'state' in mem['user']['address'] else '',
+        'zipcode': lambda mem: mem['user']['address']['zipcode'] if 'address' in mem['user'] and 'state' in mem['user']['address'] else '',
         'primary_member': 'primary_member',
         'membership_start': 'membership_start',
         'membership_end': 'membership_end',
