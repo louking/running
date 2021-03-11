@@ -524,8 +524,9 @@ class ClubMemberships():
         self.city2mships = self.attr2mships['city']
         self.dob2mships = self.attr2mships['dob']
 
-        # collect nicknames for debugging
+        # collect nicknames, and lastnames for debugging
         self.nicknames = []
+        self.lastnames = []
 
         # second pass, try to identify members
         # main hash key is first user_id encountered for member (should be most recently used)
@@ -597,6 +598,12 @@ class ClubMemberships():
                             self.alias2userid[mship.user_id] = m.user_id
                             self.userid2mem[m.user_id].user_ids.append(mship.user_id)
                             self.userid2mem[m.user_id].mships.append(mship)
+
+                            # for debugging
+                            self.lastnames.append('{} ; {}'.format(
+                                '{} {}'.format(m.first_name, m.last_name),
+                                '{} {}'.format(mship.first_name, mship.last_name)
+                            ))
                             break
 
                 # maybe member is using a nickname which is different from a first name used in an earlier membership.
