@@ -443,7 +443,7 @@ class ClubMembership():
     '''
     # set up transformation to flatten record into ClubMembership object with attributes named as Transform keys
     # transform is from RunSignUp.members.get - see https://runsignup.com/API/club/:club_id/members/GET
-    xform = Transform({
+    xformmapping = {
         'user_id': lambda mem: mem['user']['user_id'],
         'membership_id': 'membership_id',
         'club_membership_level_name': 'club_membership_level_name',
@@ -462,9 +462,16 @@ class ClubMembership():
         'membership_start': 'membership_start',
         'membership_end': 'membership_end',
         'last_modified': 'last_modified',
-    },
+    }
+    # don't convert any of this to int / float, except user_id, membership_id, zipcode
+    knownstrings = list(xformmapping.keys())
+    knownstrings.remove('user_id')
+    knownstrings.remove('membership_id')
+    knownstrings.remove('zipcode')
+    xform = Transform(xformmapping,
         sourceattr=False,   # source is dict
-        targetattr=True     # target is ClubMembership
+        targetattr=True,    # target is ClubMembership
+        knownstrings=knownstrings,
     )
 
     def transform(self, rawrsumembership):
