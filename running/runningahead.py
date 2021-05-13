@@ -161,7 +161,11 @@ class RunningAhead():
         # see http://requests-oauthlib.readthedocs.org/en/latest/oauth2_workflow.html#legacy-application-flow
         client = BackendApplicationClient(client_id=key)
         oauth = OAuth2Session(client=client)
-        data = oauth.fetch_token(token_url='https://api.runningahead.com/oauth2/token', client_id=key, client_secret=secret)
+        data = oauth.fetch_token(
+            token_url='https://api.runningahead.com/oauth2/token', 
+            client_id=key, 
+            client_secret=secret,
+            include_client_id=True)
         self.client_credentials = data['access_token']
 
         # set up session for multiple requests
