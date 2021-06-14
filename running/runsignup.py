@@ -35,6 +35,7 @@ from os import stat, chmod, rename, remove
 from tempfile import NamedTemporaryFile
 
 # pypi
+from flask import current_app
 import requests
 
 # github
@@ -42,8 +43,7 @@ import requests
 # other
 
 # home grown
-from loutilities.configparser import getitems
-from loutilities. timeu import asctime
+from loutilities.timeu import asctime
 from loutilities.transform import Transform
 from loutilities.csvwt import record2csv
 from loutilities.nicknames import NameDenormalizer
@@ -52,7 +52,12 @@ names = NameDenormalizer()
 # login API (deprecated)
 login_url = 'https://runsignup.com/rest/login'
 logout_url = 'https://runsignup.com/rest/logout'
+
+# methods
 members_url = 'https://runsignup.com/rest/club/{club_id}/members'
+getrace_url = 'https://runsignup.com/rest/race/{race_id}'
+getresultsets_url = 'https://runsignup.com/rest/race/{race_id}/results/get-result-sets'
+geteventresults_url = 'https://runsignup.com/rest/race/{race_id}/results/get-results'
 
 # OAuth stuff - NOT USED
 # request_token_url = 'https://runsignup.com/oauth/requestToken.php'
@@ -83,8 +88,7 @@ class RunSignUp():
     :param debug: set to True for debug logging of http requests, default False
     '''
 
-    #----------------------------------------------------------------------
-    def __init__(self, key=None, secret=None, email=None, password=None, debug=False):
+    def __init__(self, userpriv=False, key=None, secret=None, email=None, password=None, debug=False):
         """
         initialize
         """
@@ -104,8 +108,9 @@ class RunSignUp():
             requests_log.setLevel(logging.NOTSET)
             requests_log.propagate = False
 
+        self.userpriv = False
         if (not key and not email):
-            raise parameterError('either key/secret or email/password must be supplied')
+            self.userpriv = True
         if (key and not secret) or (secret and not key):
             raise parameterError('key and secret must be supplied together')
         if (email and not password) or (password and not email):
@@ -117,43 +122,43 @@ class RunSignUp():
         self.password = password
         self.debug = debug
         self.client_credentials = {}
-        if key:
+
+        if self.userpriv:
+            self.credentials_type = 'none'
+        elif key:
             self.credentials_type = 'key'
         else:
             self.credentials_type = 'login'
 
-    #----------------------------------------------------------------------
     def __enter__(self):
         self.open()
         return self
 
-    #----------------------------------------------------------------------
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    #----------------------------------------------------------------------
     def open(self):
 
         # set up session for multiple requests
         self.session = requests.Session()
 
-        # key / secret supplied - this take precedence
-        if self.credentials_type == 'key':
-            self.client_credentials = {'api_key'    : self.key,
-                                       'api_secret' : self.secret}
+        if not self.userpriv:
+            # key / secret supplied - this take precedence
+            if self.credentials_type == 'key':
+                self.client_credentials = {'api_key'    : self.key,
+                                        'api_secret' : self.secret}
 
-        # email / password supplied
-        else:     
-            # login to runsignup - note temporary keys will expire 1 hour after last API call
-            # see https://runsignup.com/API/login/POST
-            r = requests.post(login_url, params={'format' : 'json'}, data={'email' : self.email, 'password' : self.password})
-            resp = r.json()
+            # email / password supplied
+            else:     
+                # login to runsignup - note temporary keys will expire 1 hour after last API call
+                # see https://runsignup.com/API/login/POST
+                r = requests.post(login_url, params={'format' : 'json'}, data={'email' : self.email, 'password' : self.password})
+                resp = r.json()
 
-            self.credentials_type = 'login'
-            self.client_credentials = {'tmp_key'    : resp['tmp_key'],
-                                       'tmp_secret' : resp['tmp_secret']}
+                self.credentials_type = 'login'
+                self.client_credentials = {'tmp_key'    : resp['tmp_key'],
+                                        'tmp_secret' : resp['tmp_secret']}
 
-    #----------------------------------------------------------------------
     def close(self):
         '''
         close down
@@ -163,10 +168,10 @@ class RunSignUp():
 
         # TODO: should we also log out?
 
-    #----------------------------------------------------------------------
     def members(self, club_id, **kwargs):
         '''
         return members accessible to this application
+        requires credentials
 
         :param club_id: numeric club id
         :param kwargs: non-default arguments, per https://runsignup.com/API/club/:club_id/members/GET
@@ -201,10 +206,177 @@ class RunSignUp():
         
         return members
         
-    #----------------------------------------------------------------------
+    def getrace(self, race_id, **kwargs):
+        """
+        return information about a specific race
+        uses get race RSU method
+        does not require credentials (userpriv=True)
+
+        :param race_id: id of race
+        """
+
+        if self.debug:
+            current_app.logger.debug('getrace({})'.format(race_id))
+
+        data = self._rsuget(
+            getrace_url.format(race_id=race_id),
+            **kwargs
+        )
+        race = data['race']
+
+        return race
+
+    def getraceevents(self, race_id, **kwargs):
+        """
+        return events for race information accessible to this application
+        uses get race RSU method
+        does not require credentials (userpriv=True)
+
+        :param race_id: id of race
+        """
+
+        if self.debug:
+            current_app.logger.debug('getraceevents({})'.format(race_id))
+
+        data = self._rsuget(
+            getrace_url.format(race_id=race_id),
+            **kwargs
+        )
+        events = data['race']['events']
+
+        return events
+
+    def getresultsets(self, race_id, event_id, **kwargs):
+        """
+        return result sets for race event
+        uses get event results RSU method
+        does not require credentials (userpriv=True)
+
+        :param race_id: id of race
+        :param event_id: event_id of interest
+        """
+        if self.debug:
+            current_app.logger.debug('getraceevents({})'.format(race_id))
+
+        data = self._rsuget(
+            getresultsets_url.format(race_id=race_id),
+            event_id=event_id,
+            **kwargs
+        )
+        resultsets = data['individual_results_sets']
+
+        return resultsets
+
+    def geteventresults(self, race_id, event_id, individual_result_set_id, **kwargs):
+        """
+        return results for race event (dict format)
+        uses get event results RSU method
+        does not require credentials (userpriv=True)
+
+        :param race_id: id of race
+        :param event_id: event_id of interest
+        :param individual_result_set_id: result set id of interest
+        :rtype: {'results': [result, result, ...], 'headers': {rsucolheader: configuredcolheader, ... }}
+        """
+        if self.debug:
+            current_app.logger.debug('getraceevents({})'.format(race_id))
+
+        # max number of results in results list is 100, so need to loop, collecting
+        # BITESIZE users at a time.  These are all added to users list, and final
+        # list is returned to the caller
+        BITESIZE = 100
+        page = 1
+        results = []
+        headers = None
+        while True:
+            data = self._rsuget(
+                geteventresults_url.format(race_id=race_id),
+                event_id=event_id,
+                individual_result_set_id=individual_result_set_id,
+                page=page,
+                results_per_page=BITESIZE,
+                **kwargs
+            )
+            # there should only be one individual result set, matching individual_result_set_id
+            theseresults = []
+            for resultset in data['individual_results_sets']:
+                theseresults += resultset['results']
+                # update headers first time through
+                if not headers:
+                    headers = resultset['results_headers']
+
+            if len(theseresults) == 0: break
+            
+            results += theseresults
+            page += 1
+
+        return {'results': results, 'headers': headers}
+
+    def geteventresultscsv(self, race_id, event_id, individual_result_set_id, **kwargs):
+        """
+        return results for race event (csv format)
+        uses get event results RSU method
+        does not require credentials (userpriv=True)
+
+        :param race_id: id of race
+        :param event_id: event_id of interest
+        :param individual_result_set_id: result set id of interest
+        :rtype: csv file data
+        """
+        if self.debug:
+            current_app.logger.debug('getraceevents({})'.format(race_id))
+
+        # loop thru results, BITESIZE at a time
+        BITESIZE = 50
+        page = 1
+        results = []
+        while True:
+            csvdata = self._rsugetcsv(
+                geteventresults_url.format(race_id=race_id),
+                event_id=event_id,
+                individual_result_set_id=individual_result_set_id,
+                page=page,
+                results_per_page=BITESIZE,
+                **kwargs
+            )
+            # remove final newline, if present
+            if csvdata[-1] == '\n':
+                csvdata = csvdata[:-1]
+            theseresults = csvdata.split('\n')
+            header = theseresults.pop(0)
+            if len(theseresults) == 0: break
+            results += theseresults
+            page += 1
+
+        return '\n'.join([header] + results)
+
+    def _rsugetcsv(self, methodurl, **payload):
+        """
+        get method for runsignup access (csv format response)
+        
+        :param methodurl: runsignup method url to call
+        :param contentfield: content field to retrieve from response
+        :param **payload: parameters for the method
+        """
+        
+        thispayload = self.client_credentials.copy()
+        thispayload.update(payload)
+        thispayload.update({'format':'csv'})
+
+        resp = self.session.get(methodurl, params=thispayload)
+        if resp.status_code != 200:
+            raise accessError('HTTP response code={}, url={}'.format(resp.status_code,resp.url))
+
+        data = resp.text
+
+        # if 'error' in data:
+        #     raise accessError('RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url))
+    
+        return data 
+
     def _rsuget(self, methodurl, **payload):
         """
-        get method for runsignup access
+        get method for runsignup access (json format response)
         
         :param methodurl: runsignup method url to call
         :param contentfield: content field to retrieve from response
