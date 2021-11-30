@@ -682,7 +682,7 @@ class ClubMemberships():
         '''
         self.memberships = memberships
 
-        # first pass, collect all memberships by dob
+        # first pass, collect all memberships by fields in userfields
         self.attr2mships = {}
         for field in ClubMemberships.alluserfields:
             self.attr2mships[field] = {}

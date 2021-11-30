@@ -322,13 +322,18 @@ class UltraSignup():
                 result.set(list(zip(UltraSignupResult.attrs,vals)))
                 result.racename,result.distmiles,result.distkm = racenameanddist(usresult['eventname'])
                 
-                # distmiles == None if this was a timed race.  result.racetime has distance in miles
+                # distmiles == None if this was a timed race.  result.racetime may have distance in miles
                 if result.distmiles == None:
                     result.racename,duration = racenameanddur(usresult['eventname'])
                     if duration is None: continue   # didn't recognize units
                     
                     result.distmiles = result.racetime
-                    result.distkm = result.distmiles * (MPERMILE/1000)
+                    # assume result.distmiles is a number. If not skip this result
+                    try:
+                        result.distkm = result.distmiles * (MPERMILE/1000)
+                    except TypeError:
+                        self.log.warning(f'racetime parse error: skipping {fname} {lname} {usresult["eventname"]} {usresult["eventdate"]}: could not parse {result.distmiles} as distance')
+                        continue
                     # this is in hours so should render correctly
                     result.racetime = render.rendertime(duration*60*60.0,0)
                 
