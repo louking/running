@@ -587,7 +587,7 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
     return rsumembers
 
 #----------------------------------------------------------------------
-def members2csv(club_id, key, secret, mapping, filepath=None):
+def members2csv(club_id, key, secret, mapping, filepath=None, encoding=None):
     '''
     Access club_id through RunSignUp API to retrieve members. Return
     list of members as if csv file. Optionally save csv file.
@@ -597,6 +597,7 @@ def members2csv(club_id, key, secret, mapping, filepath=None):
     :param secret: api secret for RunSignUp
     :param mapping: OrderedDict {'outfield1':'infield1', 'outfield2':outfunction(inrec), ...} or ['inoutfield1', 'inoutfield2', ...]
     :param normfile: (optional) pathname to save csv file
+    :param encoding: (optional) encoding to use for file
     :rtype: csv file records, as list
     '''
 
@@ -604,7 +605,7 @@ def members2csv(club_id, key, secret, mapping, filepath=None):
     with RunSignUp(key=key, secret=secret) as rsu:
         members = rsu.members(club_id)
 
-    filerows = record2csv(members, mapping, filepath)
+    filerows = record2csv(members, mapping, filepath, encoding=encoding)
 
     return filerows
 
