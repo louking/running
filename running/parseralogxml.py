@@ -27,8 +27,8 @@ def convertsecs(dur):
     
 def main():
     parser = ArgumentParser()
-    parser.add_argument('-X', '--xmlfile', help='input xml file, from RunningAHEAD export')
-    parser.add_argument('-C', '--csvfile', help='output csv file')
+    parser.add_argument('-X', '--xmlfile', help='input xml file, from RunningAHEAD export', required=True)
+    parser.add_argument('-C', '--csvfile', help='output csv file', required=True)
     args = parser.parse_args()
 
     fieldnames = 'date,time,type,subtype,dist,duration,equipment,route,temp,notes'.split(',')
