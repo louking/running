@@ -14,6 +14,6 @@ sqlalchemy==1.4.15
 typing-extensions==3.10.0.0
 tzlocal==3.0b1
 unicodecsv==0.14.1
-urllib3==1.26.4
+urllib3==1.26.5
 xlrd==2.0.1
 zipp==3.4.1
