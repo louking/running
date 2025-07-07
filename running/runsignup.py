@@ -56,6 +56,7 @@ logout_url = 'https://runsignup.com/rest/logout'
 # methods
 members_url = 'https://runsignup.com/rest/club/{club_id}/members'
 getrace_url = 'https://runsignup.com/rest/race/{race_id}'
+getracedivisions_url = 'https://runsignup.com/rest/race/{race_id}/divisions/divisions'
 getresultsets_url = 'https://runsignup.com/rest/race/{race_id}/results/get-result-sets'
 geteventresults_url = 'https://runsignup.com/rest/race/{race_id}/results/get-results'
 
@@ -246,6 +247,27 @@ class RunSignUp():
 
         return events
 
+    def getracedivisions(self, race_id, event_id, **kwargs):
+        """
+        return information about a specific race's divisions
+        uses get race divisions RSU method
+        does not require credentials (userpriv=True)
+
+        :param race_id: id of race
+        """
+
+        if self.debug:
+            current_app.logger.debug(f'getracedivisions({race_id}, {event_id})')
+
+        data = self._rsuget(
+            getracedivisions_url.format(race_id=race_id),
+            event_id=event_id,
+            **kwargs
+        )
+        racedivisions = data['race_divisions']
+
+        return racedivisions
+
     def getresultsets(self, race_id, event_id, **kwargs):
         """
         return result sets for race event
@@ -282,7 +304,7 @@ class RunSignUp():
             current_app.logger.debug('getraceevents({})'.format(race_id))
 
         # max number of results in results list is 100, so need to loop, collecting
-        # BITESIZE users at a time.  These are all added to users list, and final
+        # BITESIZE results at a time.  These are all added to results list, and final
         # list is returned to the caller
         BITESIZE = 100
         page = 1
