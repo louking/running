@@ -37,6 +37,7 @@ from tempfile import NamedTemporaryFile
 # pypi
 from flask import current_app
 import requests
+from universalclient import Client as UniversalClient
 
 # github
 
@@ -49,21 +50,19 @@ from loutilities.csvwt import record2csv
 from loutilities.nicknames import NameDenormalizer
 names = NameDenormalizer()
 
+# use api.runsignup.com per https://info.runsignup.com/2025/08/06/upgrading-our-api-infrastructure-for-ai-api-runsignup-com/
+
 # login API (deprecated)
-login_url = 'https://runsignup.com/rest/login'
-logout_url = 'https://runsignup.com/rest/logout'
+login_url = 'https://api.runsignup.com/rest/login'
+logout_url = 'https://api.runsignup.com/rest/logout'
 
 # methods
-members_url = 'https://runsignup.com/rest/club/{club_id}/members'
-getrace_url = 'https://runsignup.com/rest/race/{race_id}'
-getracedivisions_url = 'https://runsignup.com/rest/race/{race_id}/divisions/divisions'
-getresultsets_url = 'https://runsignup.com/rest/race/{race_id}/results/get-result-sets'
-geteventresults_url = 'https://runsignup.com/rest/race/{race_id}/results/get-results'
-
-# OAuth stuff - NOT USED
-# request_token_url = 'https://runsignup.com/oauth/requestToken.php'
-# verify_url = 'https://runsignup.com/OAuth/Verify'
-# access_token_url = 'https://runsignup.com/oauth/accessToken.php'
+members_url = 'https://api.runsignup.com/rest/club/{club_id}/members'
+getrace_url = 'https://api.runsignup.com/rest/race/{race_id}'
+getracedivisions_url = 'https://api.runsignup.com/rest/race/{race_id}/divisions/divisions'
+getresultsets_url = 'https://api.runsignup.com/rest/race/{race_id}/results/get-result-sets'
+geteventresults_url = 'https://api.runsignup.com/rest/race/{race_id}/results/get-results'
+getraceparticipants_url = 'https://api.runsignup.com/rest/race/{race_id}/participants'
 
 KMPERMILE = 1.609344
 
@@ -152,7 +151,7 @@ class RunSignUp():
             # email / password supplied
             else:     
                 # login to runsignup - note temporary keys will expire 1 hour after last API call
-                # see https://runsignup.com/API/login/POST
+                # see https://api.runsignup.com/API/login/POST
                 r = requests.post(login_url, params={'format' : 'json'}, data={'email' : self.email, 'password' : self.password})
                 resp = r.json()
 
@@ -175,8 +174,8 @@ class RunSignUp():
         requires credentials
 
         :param club_id: numeric club id
-        :param kwargs: non-default arguments, per https://runsignup.com/API/club/:club_id/members/GET
-        :return: members list (format per https://runsignup.com/API/club/:club_id/members/GET)
+        :param kwargs: non-default arguments, per https://api.runsignup.com/API/club/:club_id/members/GET
+        :return: members list (format per https://api.runsignup.com/API/club/:club_id/members/GET)
         '''
         """
         return members accessible to this application
@@ -637,7 +636,7 @@ class ClubMembership():
     holds attributes for club membership
     '''
     # set up transformation to flatten record into ClubMembership object with attributes named as Transform keys
-    # transform is from RunSignUp.members.get - see https://runsignup.com/API/club/:club_id/members/GET
+    # transform is from RunSignUp.members.get - see https://api.runsignup.com/API/club/:club_id/members/GET
     xformmapping = {
         'user_id': lambda mem: mem['user']['user_id'],
         'membership_id': 'membership_id',
@@ -873,3 +872,35 @@ class ClubMemberships():
             self.userid2mem[member]
             for member in self.userid2mem
         )
+
+class RunSignupFluent(UniversalClient):
+    from rauth import OAuth2Service
+    
+    '''
+    Fluent interface to RunSignUp API -- see https://universal-client.readthedocs.io
+    '''
+    def __init__(self, key=None, secret=None, debug=False):
+        '''
+        initialize RunSignUp Fluent client
+
+        :param key: api key for RunSignUp
+        :param secret: api secret for RunSignUp
+        :param debug: debug flag
+        '''
+        # rsuservice = Oauth2Service(
+        #     name='runsignup',
+        #     authorize_url='https://www.runsignup.com/oauth2/authorize',
+        #     access_token_url='https://api.runsignup.com/oauth2/token',
+        #     client_id=key,
+        #     client_secret=secret,
+        # )
+
+        self._params = params = {'api_key'    : key,
+                                 'api_secret' : secret,
+                                 'format'     : 'json' }
+        
+        super().__init__(
+            url='https://api.runsignup.com/rest',
+            params=params,
+        )
+    
