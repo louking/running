@@ -46,6 +46,9 @@ from oauthlib.oauth2 import BackendApplicationClient
 # home grown
 # from running import *
 from loutilities import apikey
+import version
+
+class parameterError(Exception): pass
 
 # OAuth stuff
 auth_url = 'https://www.runningahead.com/oauth2/authorize'
