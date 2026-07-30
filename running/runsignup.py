@@ -1,25 +1,3 @@
-###########################################################################################
-#   runsignup - access methods for runsignup.com
-#
-#   Date        Author      Reason
-#   ----        ------      ------
-#   12/31/17    Lou King    Create from runningahead.com
-#
-#   Copyright 2017 Lou King
-#
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
-#
-#       http://www.apache.org/licenses/LICENSE-2.0
-#
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-#
-###########################################################################################
 '''
 runsignup - access methods for runsignup.com
 ===================================================
@@ -37,7 +15,6 @@ from tempfile import NamedTemporaryFile
 # pypi
 from flask import current_app
 import requests
-from universalclient import Client as UniversalClient
 
 # github
 
@@ -51,10 +28,6 @@ from loutilities.nicknames import NameDenormalizer
 names = NameDenormalizer()
 
 # use api.runsignup.com per https://info.runsignup.com/2025/08/06/upgrading-our-api-infrastructure-for-ai-api-runsignup-com/
-
-# login API (deprecated)
-login_url = 'https://api.runsignup.com/rest/login'
-logout_url = 'https://api.runsignup.com/rest/logout'
 
 # methods
 members_url = 'https://api.runsignup.com/rest/club/{club_id}/members'
@@ -74,21 +47,25 @@ class parameterError(Exception): pass
 thislogger = logging.getLogger("running.runsignup")
 
 ########################################################################
-class RunSignUp():
+class RunSignupBase():
     '''
-    access methods for RunSignUp.com
+    common session / authentication / low-level request handling for RunSignUp.com REST API clients
 
-    either key and secret OR email and password should be supplied
-    key and secret take precedence
+    key and secret should be supplied for authenticated access
+
+    per https://info.runsignup.com/2026/07/17/new-api-registration-requirements/, all API callers must
+    register (free) and supply the resulting token/secret on every call starting 2027-01-01; existing
+    api_key/api_secret credentials are unaffected and continue to be required alongside these
 
     :param key: key from runsignup (direct key, no OAuth)
     :param secret: secret from runsignup (direct secret, no OAuth)
-    :param email: email for use by Login API (deprecated)
-    :param password: password for use by Login API (deprecated)
+    :param api_reg_token: API caller registration token, sent as rsu_api_reg GET parameter
+    :param api_reg_secret: API caller registration secret, sent as X-RSU-API-REG-SECRET header
     :param debug: set to True for debug logging of http requests, default False
     '''
 
-    def __init__(self, userpriv=False, key=None, secret=None, email=None, password=None, debug=False):
+    def __init__(self, userpriv=False, key=None, secret=None,
+                 api_reg_token=None, api_reg_secret=None, debug=False):
         """
         initialize
         """
@@ -108,27 +85,20 @@ class RunSignUp():
             requests_log.setLevel(logging.NOTSET)
             requests_log.propagate = False
 
-        self.userpriv = False
-        if (not key and not email):
-            self.userpriv = True
+        self.userpriv = not key
         if (key and not secret) or (secret and not key):
             raise parameterError('key and secret must be supplied together')
-        if (email and not password) or (password and not email):
-            raise parameterError('email and password must be supplied together')
+        if (api_reg_token and not api_reg_secret) or (api_reg_secret and not api_reg_token):
+            raise parameterError('api_reg_token and api_reg_secret must be supplied together')
 
         self.key = key
         self.secret = secret
-        self.email = email
-        self.password = password
+        self.api_reg_token = api_reg_token
+        self.api_reg_secret = api_reg_secret
         self.debug = debug
         self.client_credentials = {}
 
-        if self.userpriv:
-            self.credentials_type = 'none'
-        elif key:
-            self.credentials_type = 'key'
-        else:
-            self.credentials_type = 'login'
+        self.credentials_type = 'none' if self.userpriv else 'key'
 
     def __enter__(self):
         self.open()
@@ -142,22 +112,18 @@ class RunSignUp():
         # set up session for multiple requests
         self.session = requests.Session()
 
+        # per https://info.runsignup.com/2026/07/17/new-api-registration-requirements/, registration
+        # secret is sent as a header, applies regardless of credentials_type
+        if self.api_reg_secret:
+            self.session.headers.update({'X-RSU-API-REG-SECRET': self.api_reg_secret})
+
         if not self.userpriv:
-            # key / secret supplied - this take precedence
-            if self.credentials_type == 'key':
-                self.client_credentials = {'api_key'    : self.key,
-                                        'api_secret' : self.secret}
+            self.client_credentials = {'api_key'    : self.key,
+                                    'api_secret' : self.secret}
 
-            # email / password supplied
-            else:     
-                # login to runsignup - note temporary keys will expire 1 hour after last API call
-                # see https://api.runsignup.com/API/login/POST
-                r = requests.post(login_url, params={'format' : 'json'}, data={'email' : self.email, 'password' : self.password})
-                resp = r.json()
-
-                self.credentials_type = 'login'
-                self.client_credentials = {'tmp_key'    : resp['tmp_key'],
-                                        'tmp_secret' : resp['tmp_secret']}
+        # registration token is sent as a GET parameter alongside whichever credentials were set above
+        if self.api_reg_token:
+            self.client_credentials['rsu_api_reg'] = self.api_reg_token
 
     def close(self):
         '''
@@ -166,7 +132,61 @@ class RunSignUp():
         self.client_credentials = {}
         self.session.close()
 
-        # TODO: should we also log out?
+    def _rsugetcsv(self, methodurl, **payload):
+        """
+        get method for runsignup access (csv format response)
+
+        :param methodurl: runsignup method url to call
+        :param contentfield: content field to retrieve from response
+        :param **payload: parameters for the method
+        """
+
+        thispayload = self.client_credentials.copy()
+        thispayload.update(payload)
+        thispayload.update({'format':'csv'})
+
+        resp = self.session.get(methodurl, params=thispayload)
+        if resp.status_code != 200:
+            raise accessError('HTTP response code={}, url={}'.format(resp.status_code,resp.url))
+
+        data = resp.text
+
+        # if 'error' in data:
+        #     raise accessError('RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url))
+
+        return data
+
+    def _rsuget(self, methodurl, **payload):
+        """
+        get method for runsignup access (json format response)
+
+        :param methodurl: runsignup method url to call
+        :param contentfield: content field to retrieve from response
+        :param **payload: parameters for the method
+        """
+
+        thispayload = self.client_credentials.copy()
+        thispayload.update(payload)
+        thispayload.update({'format':'json'})
+
+        resp = self.session.get(methodurl, params=thispayload)
+        if resp.status_code != 200:
+            raise accessError('HTTP response code={}, url={}'.format(resp.status_code,resp.url))
+
+        data = resp.json()
+
+        if 'error' in data:
+            raise accessError('RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url))
+
+        return data
+
+########################################################################
+class RunSignUp(RunSignupBase):
+    '''
+    access methods for RunSignUp.com
+
+    see :class:`RunSignupBase` for authentication / session parameters
+    '''
 
     def members(self, club_id, **kwargs):
         '''
@@ -371,56 +391,9 @@ class RunSignUp():
 
         return '\n'.join([header] + results)
 
-    def _rsugetcsv(self, methodurl, **payload):
-        """
-        get method for runsignup access (csv format response)
-        
-        :param methodurl: runsignup method url to call
-        :param contentfield: content field to retrieve from response
-        :param **payload: parameters for the method
-        """
-        
-        thispayload = self.client_credentials.copy()
-        thispayload.update(payload)
-        thispayload.update({'format':'csv'})
-
-        resp = self.session.get(methodurl, params=thispayload)
-        if resp.status_code != 200:
-            raise accessError('HTTP response code={}, url={}'.format(resp.status_code,resp.url))
-
-        data = resp.text
-
-        # if 'error' in data:
-        #     raise accessError('RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url))
-    
-        return data 
-
-    def _rsuget(self, methodurl, **payload):
-        """
-        get method for runsignup access (json format response)
-        
-        :param methodurl: runsignup method url to call
-        :param contentfield: content field to retrieve from response
-        :param **payload: parameters for the method
-        """
-        
-        thispayload = self.client_credentials.copy()
-        thispayload.update(payload)
-        thispayload.update({'format':'json'})
-
-        resp = self.session.get(methodurl, params=thispayload)
-        if resp.status_code != 200:
-            raise accessError('HTTP response code={}, url={}'.format(resp.status_code,resp.url))
-
-        data = resp.json()
-
-        if 'error' in data:
-            raise accessError('RSU response code={}-{}, url={}'.format(data['error']['error_code'],data['error']['error_msg'],resp.url))
-    
-        return data 
-        
 #----------------------------------------------------------------------
-def updatemembercache(club_id, membercachefilename, key=None, secret=None, email=None, password=None, debug=False):
+def updatemembercache(club_id, membercachefilename, key=None, secret=None,
+                       api_reg_token=None, api_reg_secret=None, debug=False):
     if debug:
         # set up debug logging
         thislogger.setLevel(logging.DEBUG)
@@ -431,7 +404,8 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
         thislogger.propagate = True
 
     # set up access to RunSignUp
-    rsu = RunSignUp(key=key, secret=secret, email=email, password=password, debug=debug)
+    rsu = RunSignUp(key=key, secret=secret,
+                     api_reg_token=api_reg_token, api_reg_secret=api_reg_secret, debug=debug)
     rsu.open()
 
     # transform from RunSignUp to membercache format
@@ -608,7 +582,8 @@ def updatemembercache(club_id, membercachefilename, key=None, secret=None, email
     return rsumembers
 
 #----------------------------------------------------------------------
-def members2csv(club_id, key, secret, mapping, filepath=None, encoding=None):
+def members2csv(club_id, key, secret, mapping, filepath=None, encoding=None,
+                 api_reg_token=None, api_reg_secret=None):
     '''
     Access club_id through RunSignUp API to retrieve members. Return
     list of members as if csv file. Optionally save csv file.
@@ -619,11 +594,13 @@ def members2csv(club_id, key, secret, mapping, filepath=None, encoding=None):
     :param mapping: OrderedDict {'outfield1':'infield1', 'outfield2':outfunction(inrec), ...} or ['inoutfield1', 'inoutfield2', ...]
     :param normfile: (optional) pathname to save csv file
     :param encoding: (optional) encoding to use for file
+    :param api_reg_token: API caller registration token, sent as rsu_api_reg GET parameter
+    :param api_reg_secret: API caller registration secret, sent as X-RSU-API-REG-SECRET header
     :rtype: csv file records, as list
     '''
 
     # get the members from the RunSignUp API
-    with RunSignUp(key=key, secret=secret) as rsu:
+    with RunSignUp(key=key, secret=secret, api_reg_token=api_reg_token, api_reg_secret=api_reg_secret) as rsu:
         members = rsu.members(club_id)
 
     filerows = record2csv(members, mapping, filepath, encoding=encoding)
@@ -873,34 +850,3 @@ class ClubMemberships():
             for member in self.userid2mem
         )
 
-class RunSignupFluent(UniversalClient):
-    from rauth import OAuth2Service
-    
-    '''
-    Fluent interface to RunSignUp API -- see https://universal-client.readthedocs.io
-    '''
-    def __init__(self, key=None, secret=None, debug=False):
-        '''
-        initialize RunSignUp Fluent client
-
-        :param key: api key for RunSignUp
-        :param secret: api secret for RunSignUp
-        :param debug: debug flag
-        '''
-        # rsuservice = Oauth2Service(
-        #     name='runsignup',
-        #     authorize_url='https://www.runsignup.com/oauth2/authorize',
-        #     access_token_url='https://api.runsignup.com/oauth2/token',
-        #     client_id=key,
-        #     client_secret=secret,
-        # )
-
-        self._params = params = {'api_key'    : key,
-                                 'api_secret' : secret,
-                                 'format'     : 'json' }
-        
-        super().__init__(
-            url='https://api.runsignup.com/rest',
-            params=params,
-        )
-    
