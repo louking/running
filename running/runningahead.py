@@ -28,7 +28,6 @@ runningahead - access methods for runningahead.com
 
 # standard
 import pdb
-import argparse
 import os.path
 import logging
 import json
@@ -46,7 +45,6 @@ from oauthlib.oauth2 import BackendApplicationClient
 # home grown
 # from running import *
 from loutilities import apikey
-import version
 
 class parameterError(Exception): pass
 
@@ -452,23 +450,4 @@ class RunningAhead():
             raise accessError('RA response code={}, url={}'.format(content['code'],r.url))
     
         data = content['data']
-        return data 
-        
-#----------------------------------------------------------------------
-def main(): 
-#----------------------------------------------------------------------
-    descr = '''
-    unit test for runningahead.py
-    '''
-    
-    parser = argparse.ArgumentParser(description=descr,formatter_class=argparse.RawDescriptionHelpFormatter,
-                                     version='{0} {1}'.format('running',version.__version__))
-    args = parser.parse_args()
-
-    # this would be a good place for unit tests
-    
-# ##########################################################################################
-#	__main__
-# ##########################################################################################
-if __name__ == "__main__":
-    main()
+        return data
