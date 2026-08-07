@@ -101,7 +101,12 @@ history for a file before assuming it's current. The actively maintained modules
   installed. Prefer this for new work unless there's a reason to match existing `RunSignUp` call sites.
 - **`runningahead.py`** — client for the RunningAhead API (`RunningAhead` class), OAuth2-based
   (`requests_oauthlib`). Includes unit-conversion helpers (`dist2miles`, `dist2meters`) for RunningAhead's
-  `{'value':..., 'unit':...}` distance representation.
+  `{'value':..., 'unit':...}` distance representation. A module-level `import version` (bare, not
+  `from running import version`) was removed 2026-08 — it never resolved (`ModuleNotFoundError: No module
+  named 'version'`), breaking `import running.runningahead` for every consumer (discovered via rrwebapp). It
+  only existed to feed a dead Python2-era `argparse`/`main()` CLI block, which was removed along with it. If a
+  similarly unmaintained module in this package fails to import with a `ModuleNotFoundError` for a
+  suspiciously generic top-level name, suspect the same bare-absolute-import mistake before digging further.
 - **`ultrasignup.py`**, **`athlinks.py`** — similar-shaped scraper/API clients for those platforms (HTML
   scraping via `httplib2`/`BeautifulSoup` rather than a clean REST API in some cases — check the module before
   assuming a JSON API).
@@ -143,7 +148,9 @@ sibling repos under `Documents\Lou's Software\projects\`. Known consumers of `ru
   `make_runsignup_fluent_client()` factories, which as of 2026-07 import `RunSignupFluent` from
   `running.runsignup_fluent` (it moved out of `running.runsignup`) — this requires `runtilities` to be bumped
   past the pinned `3.0.0.dev1` in `members/app/requirements.txt` before that import works.
-- `rrwebapp/rrwebapp/app/src/rrwebapp/views/admin/results.py`, `.../views/admin/member.py`
+- `rrwebapp/rrwebapp/app/src/rrwebapp/views/admin/results.py`, `.../views/admin/member.py` (runsignup), and
+  `.../analyzeagegrade.py`, `.../runningaheadresults.py` (runningahead — this is what surfaced the `import
+  version` bug above)
 
 `contracts/contracts/app/src/contracts/runsignup.py` is **not** an import of this package — it's an independent
 forked copy (per its header: "Create from loutilities.runsignup") with its own `RunSignUp` class. Changes made
